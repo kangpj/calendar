@@ -65,7 +65,7 @@ socket.onmessage = (event) => {
     const message = JSON.parse(event.data);
 
     if (message.type === 'updateVotes') {
-        renderCalendar2('calendar', message.data);
+        renderCalendar('calendar', message.data);
         updateVoteStatistics();
     } else if (message.type === 'managerAuthenticated') {
         document.getElementById('key').style.display = 'none';
