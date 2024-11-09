@@ -1,0 +1,113 @@
+* {box-sizing: border-box;}
+body {font-family: Verdana, sans-serif;}
+li { margin: 2.4px; }
+
+#envelope #calendar {
+
+  width: 100%;
+}
+
+.month {
+  padding: 50px 0px;
+  width: 100%;
+  background: #1abc9c;
+  text-align: center;
+}
+
+.month ul {
+  margin: 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.month ul li {
+  color: white;
+  font-size: 20px;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+}
+
+.month .prev {
+  float: left;
+  padding-top: 10px;
+  padding-left: 25px
+}
+
+.month .next {
+  float: right;
+  padding-top: 10px;
+  padding-right: 25px;
+}
+
+.weekdays {
+  margin: 0px;
+  padding: 10px 0px;
+  background-color: #ddd;
+  list-style-type: none;
+}
+
+.weekdays li {
+  display: inline-block;
+  width: 13.6%;
+  color: #666;
+  text-align: center;
+}
+
+.inactive {
+  color: tomato;
+}
+.active {
+  color: limegreen;
+}
+
+.days {
+  margin: 0px;
+  padding: 10px 0;
+  background: #eee;
+  list-style-type: none;
+}
+
+.days li {
+  list-style-type: none;
+  display: inline-block;
+  width: 13.6%;
+  text-align: center;
+  margin-bottom: 15px;
+  font-size:18px;
+  color: #777;
+}
+
+.days li .highlight {
+  padding: 5px;
+  background: #1abc9c;
+  color: white !important
+}
+
+.days li .empty_day {
+  list-style-type: none;
+  display: inline-block;
+  text-align: center;
+  margin-bottom: 5px;
+  font-size:12px;
+  color: #777;
+}
+#key { position: absolute; top: 10px; right: 10px; cursor: pointer; display: block;}
+#lock { position: absolute; top: 10px; right: 10px; cursor: pointer; display: none;}
+#authModal {
+    display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background-color: #fff; padding: 20px; border: 1px solid #ddd; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Add media queries for smaller screens */
+@media screen and (max-width:720px) {
+  .weekdays li, .days li {width: 13.1%;}
+}
+
+@media screen and (max-width: 420px) {
+  .weekdays li, .days li {width: 12.5%;}
+  .days li .active {padding: 2px;}
+}
+
+@media screen and (max-width: 290px) {
+  .weekdays li, .days li {width: 12.2%;}
+}

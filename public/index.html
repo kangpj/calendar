@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Calnendar</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="envelope">
+        <ul>
+            <li id="wsStatus"></li>
+            <li id="whatfor">다수결로 모임 날짜를 정하는 달력입니다.</li>
+            <li id="caption"></li>
+            <li id="mostVotedDay"></li>
+            <li id="participant"></li>
+        </ul>
+    </div>
+    <div id="calendar"></div>
+    <!-- Top-right corner token -->
+    <div id="key">🔑</div>
+    <div id="lock">🔒</div>
+
+    <!-- Modal for Sign-in -->
+    <div id="authModal">
+        <label>Department: <input type="text" id="departmentInput"></label>
+        <label>Nickname: <input type="text" id="nicknameInput"></label>
+        <button id="signInBtn">Sign In</button>
+    </div>
+    <button id="resetVotesBtn" style="display: none;">Reset Votes</button>
+    <script src="app.js"></script>
+    <script src="renderCalendar.js"></script>
+    <script src="signIn.js"></script>
+</body>
+</html>
