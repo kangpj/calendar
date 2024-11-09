@@ -127,6 +127,7 @@ function loadMonth(year, month) {
 }
 
 // Render calendar based on data received
+/*
 function renderCalendar(containerId, calendarData) {
     const calendarContainer = document.getElementById(containerId);
     calendarContainer.innerHTML = '';
@@ -185,6 +186,7 @@ function renderCalendar(containerId, calendarData) {
         calendarContainer.appendChild(weekRow);
     });
 }
+*/
 
 function attemptReconnect() {
     setTimeout(() => {
