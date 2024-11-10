@@ -31,6 +31,8 @@ wss.on('connection', (ws, req) => {
     let currentUserDept = null;
     let currentUserNcik = null;
 
+    let currentDepartment = 'default'; // Initialize with default department
+
     console.log(`#${logSeq++} New client connected: ${currentClientId} from ${currentClientIP}` );
     
     ws.on('message', (message) => {
@@ -55,24 +57,23 @@ wss.on('connection', (ws, req) => {
                     type: 'pong'
                 }));
             } else if (parsedMessage.type === 'vote') {
-                const { year, month, day, clientId, userId } = parsedMessage.data;
+                const { year, month, day, userId } = parsedMessage.data;
                 console.log('Logging for debug:(vote) ', userId);
 
-                // Register vote in votesManager
-                // votesManager.toggleVote(year, month, day, userId);
+                // Register vote in votesManager for the specific department
+                votesManager.toggleVote(currentDepartment, year, month, day, userId);
 
-
-                // Broadcast updated votes to all clients
+                // Broadcast updated votes to all clients in the same department
                 if (day === 0) {
                     // unicast
                     ws.send(JSON.stringify({
                         type: 'updateVotes',
-                        data: votesManager.getAllVotes() // Send all months' votes
+                        data: votesManager.getAllVotes(currentDepartment) // Send all months' votes for department
                     }));
                 } else {
-                    broadcastMessage({
+                    broadcastDepartmentMessage(currentDepartment, {
                         type: 'updateVotes',
-                        data: votesManager.getAllVotes()
+                        data: votesManager.getAllVotes(currentDepartment)
                     });
                 }
             } else if (parsedMessage.type === 'getStatistics') {
@@ -88,23 +89,30 @@ wss.on('connection', (ws, req) => {
 
             } else if (parsedMessage.type === 'signIn') {
                 const { userId, department, nickname } = parsedMessage.data;
-                users[userId] = {department, nickname, isManager: department === 'ulsanedu' && nickname === 'caconam' };
+                usersData[userId] = { department, nickname, isManager: false };
                 currentUserId = userId;
-                console.log('Logging for debug:(signIn) ', users[userId]);
-                if (users[userId].isManager) {
+                currentDepartment = department; // Set current department
+
+                // Assign manager if first user in department
+                if (votesManager.isFirstUserInDepartment(department)) {
+                    usersData[userId].isManager = true;
+                    votesManager.assignDepartmentManager(department, userId);
                     ws.send(JSON.stringify({ type: 'managerAuthenticated' }));
                 }
+
+                console.log('User signed in:', usersData[userId]);
+
             } else if (parsedMessage.type === 'logout') {
                 if (currentUserId) {
                     console.log('Logging for debug:(logout) ', currentUserId);
-                    delete users[currentUserId];
+                    delete usersData[currentUserId];
                     currentUserId = null;
                 }
-            } else if (parsedMessage.type === 'resetVotes' && users[currentUserId]?.isManager) {
-                votesManager.clearAllVotes();
-                broadcastMessage({
+            } else if (parsedMessage.type === 'resetVotes' && usersData[currentUserId]?.isManager) {
+                votesManager.clearAllVotes(currentDepartment);
+                broadcastDepartmentMessage(currentDepartment, {
                     type: 'updateVotes',
-                    data: votesManager.getAllVotes()
+                    data: votesManager.getAllVotes(currentDepartment)
                 });
             }
         } catch (error) {
@@ -112,7 +120,7 @@ wss.on('connection', (ws, req) => {
         }
     });
 
-    ws.on('close', () => closeClient(ws, currentClientIP, currentClientId, client));
+    ws.on('close', () => closeClient(ws, currentClientIP, currentClientId, client, currentDepartment));
 });
 
 // Heartbeat function to keep connections alive
@@ -120,12 +128,12 @@ function heartbeat() {
     this.isAlive = true;
 }
 
-function closeClient(ws, ip, clientId, client) {
+function closeClient(ws, ip, clientId, client, department) {
 
-    const idx = clients.findIndex(function(item) {return item[clientId] === client}) 
-    if (idx > -1) clients.splice(idx, 1)
+    const idx = clients.findIndex(item => item.clientId === clientId && item.department === department);
+    if (idx > -1) clients.splice(idx, 1);
     ws.terminate();
-    console.log(`Client from ${ip} disconnected`);
+    console.log(`Client from ${ip} disconnected from department ${department}`);
 
 }
 
@@ -149,11 +157,11 @@ function verifyAndDecouple(clientId, providedSecret) {
     }
 }
 
-function broadcastMessage(message) {
+function broadcastDepartmentMessage(department, message) {
     const messageString = JSON.stringify(message);
     clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(messageString);
+        if (client.department === department && client.ws.readyState === WebSocket.OPEN) {
+            client.ws.send(messageString);
         }
     });
 }
