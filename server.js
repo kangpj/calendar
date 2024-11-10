@@ -70,12 +70,12 @@ wss.on('connection', (ws, req) => {
                     // unicast
                     ws.send(JSON.stringify({
                         type: 'updateVotes',
-                        data: getVotesByMonth(cookKey(year, month), votesData) // Send all months' votes for department
+                        data: getVotesByMonth(`${year}-${month}`, votesData) 
                     }));
                 } else {
                     broadcastDepartmentMessage(currentDepartment, {
                         type: 'updateVotes',
-                        data: getVotesByMonth(cookKey(year, month), votesData) // Send all months' votes for department
+                        data: getVotesByMonth(`${year}-${month}`, votesData) 
                     });
                 }
             } else if (parsedMessage.type === 'getStatistics') {
