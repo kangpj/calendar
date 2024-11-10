@@ -111,7 +111,7 @@ calendar.addEventListener('click', (e) => {
 // Generate a user ID if it doesn’t exist in localStorage
 function getToken(tokenName) {
     if (!localStorage.getItem(tokenName)) {
-        localStorage.setItem(tokenName, 'vote' + Math.random().toString(36).substr(2, 9));
+        localStorage.setItem(tokenName, 'user' + Math.random().toString(36).substr(2, 9));
     }
     return localStorage.getItem(tokenName);
 }
