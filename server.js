@@ -62,18 +62,20 @@ wss.on('connection', (ws, req) => {
 
                 // Register vote in votesManager for the specific department
                 votesManager.toggleVote(currentDepartment, year, month, day, userId);
+                const votesData = votesManager.getAllVotes(currentDepartment);
+                
 
                 // Broadcast updated votes to all clients in the same department
                 if (day === 0) {
                     // unicast
                     ws.send(JSON.stringify({
                         type: 'updateVotes',
-                        data: votesManager.getAllVotes(currentDepartment) // Send all months' votes for department
+                        data: getVotesByMonth(cookKey(year, month), votesData) // Send all months' votes for department
                     }));
                 } else {
                     broadcastDepartmentMessage(currentDepartment, {
                         type: 'updateVotes',
-                        data: votesManager.getAllVotes(currentDepartment)
+                        data: getVotesByMonth(cookKey(year, month), votesData) // Send all months' votes for department
                     });
                 }
             } else if (parsedMessage.type === 'getStatistics') {
@@ -170,7 +172,32 @@ function generateClientSecret(clientId) {
     //clientSecretNumbers.set(clientId, secretNumber);
     return secretNumber; // Provide this to the user to save for verification
 }
+/**
+ * Retrieves votes data for a specific month.
+ * @param {string} month - The month in 'YYYY-MM' format.
+ * @returns {Object} - The filtered votes data for the specified month.
+ */
+function getVotesByMonth(month, votesData) {
+    if (!month || typeof month !== 'string') {
+        throw new Error('Invalid month parameter. It should be a string in "YYYY-MM" format.');
+    }
 
+    // Validate month format using regex
+    const monthRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
+    if (!monthRegex.test(month)) {
+        throw new Error('Invalid month format. Use "YYYY-MM".');
+    }
+
+    const filteredVotes = {};
+
+    for (const [date, votes] of Object.entries(votesData)) {
+        if (date.startsWith(month)) {
+            filteredVotes[date] = votes;
+        }
+    }
+
+    return filteredVotes;
+}
 // Verify the client secret number to confirm decoupling
 function verifyAndDecouple(clientId, providedSecret) {
     const storedSecret = clientSecretNumbers.get(clientId);
