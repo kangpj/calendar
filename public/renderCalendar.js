@@ -1,7 +1,7 @@
 // public/renderCalendar2.js
 
 
-function renderCalendar2(containerId, votesData) {
+function renderCalendar(containerId, votesData) {
     const calendarContainer = document.getElementById(containerId);
     calendarContainer.innerHTML = ''; // Clear any existing content
     
