@@ -102,7 +102,7 @@ class VotesManager {
     // Handle messaging between members of a department
     sendMessage(departmentId, senderId, recipientIds, message) {
         const department = departments.get(departmentId);
-        if (!department) return null;
+        if (!department) return [];
 
         // Filter members based on recipients, exclude the sender
         const members = Array.from(department.members);
@@ -114,6 +114,65 @@ class VotesManager {
     // Function to create or retrieve the default department (for unassigned users)
     getDefaultDepartment() {
         return this.getDepartmentVotes(this.defaultDepartmentId);
+    }
+
+    // Toggle a vote for a specific date by a user in a department
+    toggleVote(departmentId, year, month, day, userId) {
+        const dateKey = `${year}-${month}-${day}`;
+        const department = departments.get(departmentId);
+        if (!department) {
+            console.error(`Department ${departmentId} does not exist.`);
+            return;
+        }
+
+        if (!department.votesData[dateKey]) {
+            department.votesData[dateKey] = new Set();
+        }
+
+        if (department.votesData[dateKey].has(userId)) {
+            department.votesData[dateKey].delete(userId);
+            console.log(`User ${userId} removed vote on ${dateKey} in department ${departmentId}.`);
+            // Optionally, remove the date key if no votes remain
+            if (department.votesData[dateKey].size === 0) {
+                delete department.votesData[dateKey];
+            }
+        } else {
+            department.votesData[dateKey].add(userId);
+            console.log(`User ${userId} added vote on ${dateKey} in department ${departmentId}.`);
+        }
+    }
+
+    // Check if the user is the first member in the department
+    isFirstUserInDepartment(departmentId) {
+        const department = departments.get(departmentId);
+        if (!department) {
+            console.error(`Department ${departmentId} does not exist.`);
+            return false;
+        }
+        return department.members.size === 0;
+    }
+
+    // Assign a manager to the department
+    assignDepartmentManager(departmentId, userId) {
+        const department = departments.get(departmentId);
+        if (!department) {
+            console.error(`Department ${departmentId} does not exist.`);
+            return;
+        }
+        department.owner = userId;
+        console.log(`User ${userId} has been assigned as manager of department ${departmentId}.`);
+    }
+
+    // Clear all votes in a department (only by manager)
+    clearAllVotes(departmentId) {
+        const department = departments.get(departmentId);
+        if (!department) {
+            console.error(`Department ${departmentId} does not exist.`);
+            return false;
+        }
+        department.votesData = {};
+        console.log(`All votes cleared in department ${departmentId}.`);
+        return true;
     }
 }
 

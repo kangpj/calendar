@@ -194,3 +194,63 @@ function attemptReconnect() {
         socket = new WebSocket('wss://piljoong.kr/ws/');
     }, 5000);
 }
+
+// Function to send chat message
+function sendChatMessage(message, recipientIds = []) {
+    const chatData = {
+        type: 'chat',
+        data: {
+            senderId: currentUserId, // Ensure currentUserId is defined
+            message: message,
+            recipientIds: recipientIds, // Array of userIds for private messages
+        }
+    };
+    socket.send(JSON.stringify(chatData));
+}
+
+// Listen for incoming chat messages
+socket.addEventListener('message', (event) => {
+    const parsedMessage = JSON.parse(event.data);
+    if (parsedMessage.type === 'chat') {
+        const { senderId, message, timestamp } = parsedMessage.data;
+        displayChatMessage(senderId, message, timestamp);
+    }
+
+    // ... handle other message types ...
+});
+
+// Function to display chat messages in the UI
+function displayChatMessage(senderId, message, timestamp) {
+    const chatContainer = document.getElementById('chat-container');
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('chat-message');
+    
+    const senderElement = document.createElement('span');
+    senderElement.classList.add('chat-sender');
+    senderElement.textContent = senderId; // Replace with sender's nickname if available
+
+    const messageContent = document.createElement('span');
+    messageContent.classList.add('chat-content');
+    messageContent.textContent = message;
+
+    const timeElement = document.createElement('span');
+    timeElement.classList.add('chat-timestamp');
+    timeElement.textContent = new Date(timestamp).toLocaleTimeString();
+
+    messageElement.appendChild(senderElement);
+    messageElement.appendChild(messageContent);
+    messageElement.appendChild(timeElement);
+
+    chatContainer.appendChild(messageElement);
+    chatContainer.scrollTop = chatContainer.scrollHeight; // Scroll to bottom
+}
+
+// Event listener for sending chat messages
+document.getElementById('send-chat-btn').addEventListener('click', () => {
+    const chatInput = document.getElementById('chat-input');
+    const message = chatInput.value.trim();
+    if (message !== '') {
+        sendChatMessage(message);
+        chatInput.value = '';
+    }
+});

@@ -114,6 +114,33 @@ wss.on('connection', (ws, req) => {
                     type: 'updateVotes',
                     data: votesManager.getAllVotes(currentDepartment)
                 });
+            } else if (parsedMessage.type === 'chat') {
+                const { senderId, message: chatMessage, recipientIds } = parsedMessage.data;
+                console.log(`Chat message from ${senderId}: ${chatMessage}`);
+                
+                // Prepare chat data to send
+                const chatData = {
+                    type: 'chat',
+                    data: {
+                        senderId,
+                        message: chatMessage,
+                        timestamp: new Date().toISOString(),
+                    }
+                };
+                
+                if (recipientIds && recipientIds.length > 0) {
+                    // Private message to specific users
+                    const recipients = votesManager.sendMessage(currentDepartment, senderId, recipientIds, chatMessage);
+                    recipients.forEach(recipient => {
+                        const recipientClient = clients.find(client => client.clientId === recipient.userId);
+                        if (recipientClient && recipientClient.ws.readyState === WebSocket.OPEN) {
+                            recipientClient.ws.send(JSON.stringify(chatData));
+                        }
+                    });
+                } else {
+                    // Broadcast to all members in the department
+                    broadcastDepartmentMessage(currentDepartment, chatData);
+                }
             }
         } catch (error) {
             console.error('Error processing message:', error);
