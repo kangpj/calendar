@@ -67,10 +67,13 @@ socket.onmessage = (event) => {
     if (message.type === 'updateVotes') {
         renderCalendar('calendar', message.data);
         updateVoteStatistics();
-    } else if (message.type === 'managerAuthenticated') {
+    } else if (message.type === 'managerAuthenticated' || message.type === 'userInitialized') {
+        // 로그인 성공 시 authModal 숨기기
+        document.getElementById('authModal').style.display = 'none';
         document.getElementById('key').style.display = 'none';
         document.getElementById('lock').style.display = 'block';
         document.getElementById('resetVotesBtn').style.display = 'block';
+        alert('성공적으로 로그인되었습니다.');
     } else if (message.type === 'pong') {
         console.log(`#${appSeq++} Received pong from server`);
     }
@@ -244,4 +247,9 @@ document.getElementById('send-chat-btn').addEventListener('click', () => {
         sendChatMessage(message);
         chatInput.value = '';
     }
+});
+
+// 'key' div를 클릭했을 때 authModal을 표시하도록 이벤트 리스너 추가
+document.getElementById('key').addEventListener('click', () => {
+    document.getElementById('authModal').style.display = 'block';
 });
