@@ -137,9 +137,10 @@ function handleDayClick(day) {
 }
 
 function cookKey(year, month, date) {
-    if (typeof date == 'undefined')
-            return `${year}-${month}`;
-    else    return `${year}-${month}-${date}`;
+    if (typeof date === 'undefined') {
+        return `${year}-${month}`;
+    }
+    return `${year}-${month}-${date}`;
 }
 
 function createMonthCalendar(year, month) {
@@ -171,23 +172,30 @@ function createMonthCalendar(year, month) {
 }
 
 function updateWorkingCalendar(year, month, votesData) {
+    if (!votesData) return;
     
     const key = cookKey(year, month);
     if (!calendars[key]) calendars[key] = createMonthCalendar(year, month);
     
-    clients.clear()
+    clients.clear();
     const calendar = calendars[key];
     calendar.weeks.forEach(week => {
         week.forEach(cell => {
             if (cell) {
-                let key = cookKey(year, month, cell.date);
-                if (votesData[key]) {
-                    clients.union(votesData[key]);
-                    cell.votes = Array.from(votesData[key]);
-                    if (cell.votes.length > maxVotes) {
-                        mostVotedDay    = cell.date;
-                        maxVotes        = cell.votes.length;        
-                    } 
+                let dateKey = `${year}-${month}-${cell.date}`;
+                cell.votes = [];
+                
+                if (votesData[dateKey]) {
+                    try {
+                        clients.union(votesData[dateKey]);
+                        cell.votes = Array.from(votesData[dateKey]);
+                        if (cell.votes.length > maxVotes) {
+                            mostVotedDay = cell.date;
+                            maxVotes = cell.votes.length;        
+                        }
+                    } catch (error) {
+                        console.error('Error processing votes for date:', dateKey, error);
+                    }
                 }
             }        
         });
