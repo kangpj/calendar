@@ -39,7 +39,7 @@ wss.on('connection', (ws, req) => {
             const parsedMessage = JSON.parse(message);
             if (parsedMessage.type === 'init') {
 
-                currentClientId = parsedMessage.data;
+                currentClientId = parsedMessage.clientId;
                 console.log(`#${logSeq++} New client connected: from ${currentClientId}` );
                 client[currentClientId] = {
                     ws:             ws,
