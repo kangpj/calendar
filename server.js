@@ -28,12 +28,11 @@ wss.on('connection', (ws, req) => {
     const client = {};
     const currentClientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     let currentClientId = null;
-    let currentUserDept = null;
-    let currentUserNcik = null;
+    let currentUserId = null;
 
     let currentDepartment = 'default'; // Initialize with default department
 
-    console.log(`#${logSeq++} New client connected: ${currentClientId} from ${currentClientIP}` );
+    console.log(`#${logSeq++} New client connected: from ${currentClientIP}` );
     
     ws.on('message', (message) => {
         try {
@@ -44,14 +43,21 @@ wss.on('connection', (ws, req) => {
                 client[currentClientId] = {
                     ws:             ws,
                     ip:             currentClientIP,
-                    secretNumber:   generateClientSecret(currentClientId)
-                    };
+                    secretNumber:   generateClientSecret(currentClientId),
+                    department:     'default'
+                };
                 clients.push(client);
                 // The very first message with vote status to the newly connected client
                 ws.send(JSON.stringify({
                     type: 'updateVotes',
                     data: votesManager.getDefaultDepartment() 
                 }));
+
+                // default 부서의 모든 클라이언트에게 새로운 클라이언트 접속 방송
+                broadcastDepartmentMessage('default', {
+                    type: 'newClient',
+                    data: { clientId: currentClientId }
+                });
             } else if (parsedMessage.type === 'ping') {
                 ws.send(JSON.stringify({
                     type: 'pong'
@@ -95,6 +101,11 @@ wss.on('connection', (ws, req) => {
                 usersData[userId] = { department, nickname, isManager: false };
                 currentUserId = userId;
                 currentDepartment = department; // Set current department
+
+                // 클라이언트 객체에 부서 정보 업데이트
+                if (client[currentClientId]) {
+                    client[currentClientId].department = department;
+                }
 
                 // Assign manager if first user in department
                 if (votesManager.isFirstUserInDepartment(department)) {
@@ -189,9 +200,12 @@ function verifyAndDecouple(clientId, providedSecret) {
 
 function broadcastDepartmentMessage(department, message) {
     const messageString = JSON.stringify(message);
-    clients.forEach(client => {
-        if (client.department === department && client.ws.readyState === WebSocket.OPEN) {
-            client.ws.send(messageString);
+    clients.forEach(clientObj => {
+        // 각 클라이언트 객체의 부서를 확인
+        for (const [clientId, client] of Object.entries(clientObj)) {
+            if (client.department === department && client.ws.readyState === WebSocket.OPEN) {
+                client.ws.send(messageString);
+            }
         }
     });
 }
