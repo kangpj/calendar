@@ -77,10 +77,24 @@ class VotesManager {
     }
 
     // Get all votes in a department (convert Set to array for JSON compatibility)
-    getAllVotes(departmentId) {
+    getAllVotes(departmentId, year, month) {
         const votesData = this.getDepartmentVotes(departmentId);
+        const filteredData = {};
+        
+        // year와 month가 제공된 경우에만 필터링
+        if (year !== undefined && month !== undefined) {
+            const prefix = `${year}-${month}`;
+            for (const [date, votes] of Object.entries(votesData)) {
+                if (date.startsWith(prefix)) {
+                    filteredData[date] = Array.from(votes);
+                }
+            }
+            return filteredData;
+        }
+        
+        // year와 month가 없으면 전체 데이터 반환
         return Object.fromEntries(
-            Object.entries(votesData).map(([date, users]) => [date, Array.from(users)])
+            Object.entries(votesData).map(([date, votes]) => [date, Array.from(votes)])
         );
     }
 
