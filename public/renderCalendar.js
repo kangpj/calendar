@@ -132,7 +132,7 @@ function navigateMonth(offset) {
 function handleDayClick(day) {
     socket.send(JSON.stringify({ 
     type: 'vote',
-    data: { year: workingYear, month: workingMonth, day: parseInt(day), clientId: getToken('clientId') }
+    data: { year: workingYear, month: hMonth, day: parseInt(day), clientId: getToken('clientId') }
     }));
 }
 
