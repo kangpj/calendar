@@ -116,23 +116,34 @@ function renderCalendar(containerId, votesData) {
 // Helper function to navigate months
 function navigateMonth(offset) {
     workingMonth += offset;
-    hMonth += offset;
-    if (workingMonth < 0) {
-        workingMonth = 11;
-        hMonth = 12;
+//    hMonth += offset;  
+    if (workingMonth < 1) {
+        workingMonth = 12;
+//        hMonth = 12;
         workingYear--;
-    } else if (workingMonth > 11) {
-        workingMonth = 0;
-        hMonth = 1;
+    } else if (workingMonth > 12) {
+        workingMonth = 1;
+//        hMonth = 1;
         workingYear++;
     }
     loadMonth(workingYear, workingMonth);
 }
+
+// Request votes for a specific month
+function loadMonth(year, month) {
+    socket.send(JSON.stringify({
+        type: 'vote',
+        data: { year, month, day: 0, userId: getToken('userId') }
+    }));
+    console.log(`#${appSeq++} send a <vote> message`);
+}
+
+
 // Send vote to WebSocket without toggling previous selections
 function handleDayClick(day) {
     socket.send(JSON.stringify({ 
     type: 'vote',
-    data: { year: workingYear, month: hMonth, day: parseInt(day), clientId: getToken('clientId') }
+    data: { year: workingYear, month: workingMonth, day: parseInt(day), clientId: getToken('clientId') }
     }));
 }
 
@@ -145,8 +156,8 @@ function cookKey(year, month, date) {
 
 function createMonthCalendar(year, month) {
     const calendar = [];
-    const firstDay = new Date(year, month, 1).getDay();
-    const lastDay = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month - 1, 1).getDay();
+    const lastDay = new Date(year, month, 0).getDate();
     let week = new Array(7).fill(null);
     let day = 1;
 
@@ -166,7 +177,7 @@ function createMonthCalendar(year, month) {
     return {
         year,
         month,
-        monthName: new Date(year, month).toLocaleString('default', { month: 'long' }),
+        monthName: new Date(year, month - 1).toLocaleString('default', { month: 'long' }),
         weeks: calendar
     };
 }

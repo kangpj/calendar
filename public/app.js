@@ -16,11 +16,11 @@ const calendars     = {};
 const users         = new Set();
 const clients       = new Set();
 const currentYear   = new Date().getFullYear();
-const currentMonth  = new Date().getMonth();
+const currentMonth  = new Date().getMonth() + 1;
 const currentDate   = new Date().getDate();
 let workingYear     = currentYear;
 let workingMonth    = currentMonth;
-let hMonth          = workingMonth + 1;
+//let hMonth          = workingMonth + 1;
 let mostVotedDay    = null;
 let maxVotes        = 0;
 let isConnected     = false;
@@ -116,15 +116,6 @@ function getToken(tokenName) {
     return localStorage.getItem(tokenName);
 }
 
-
-// Request votes for a specific month
-function loadMonth(year, month) {
-    socket.send(JSON.stringify({
-        type: 'vote',
-        data: { year, month, day: 0, userId: getToken('userId') }
-    }));
-    console.log(`#${appSeq++} send a <vote> message`);
-}
 
 // Render calendar based on data received
 /*
