@@ -198,8 +198,8 @@ function updateWorkingCalendar(year, month, votesData) {
                 
                 if (votesData[dateKey]) {
                     try {
-                        clients.union(votesData[dateKey]);
-                        cell.votes = Array.from(votesData[dateKey]);
+                        votesData[dateKey].forEach(userId => clients.add(userId));
+                        cell.votes = votesData[dateKey];
                         if (cell.votes.length > maxVotes) {
                             mostVotedDay = cell.date;
                             maxVotes = cell.votes.length;        
