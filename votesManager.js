@@ -3,10 +3,13 @@
 // Using a Map to store departments for efficient key-based management
 const departments = new Map();
 
+// 사용자 데이터가 서버에서 관리되므로, 서버에서 관리하는 usersData와 연동 필요
+const usersData = {}; // 서버에서 클라이언트와 연동되는 사용자 데이터를 관리
+
 class VotesManager {
     constructor() {
         // Default "floating" department for users not assigned to any department
-        this.defaultDepartmentId = "floating";
+        this.defaultDepartmentId = "default";
         this.getDepartmentVotes(this.defaultDepartmentId);
     }
 
@@ -51,6 +54,15 @@ class VotesManager {
             // If the owner leaves, reset the department owner
             if (department.owner === userId) {
                 department.owner = null;
+                // Optionally, assign a new owner if members exist
+                if (department.members.size > 0) {
+                    department.owner = department.members.values().next().value;
+                    const newOwner = usersData[department.owner];
+                    if (newOwner) {
+                        newOwner.isManager = true;
+                        console.log(`User ${newOwner.userId} has been assigned as new manager of department ${departmentId}.`);
+                    }
+                }
             }
         }
     }
@@ -187,6 +199,33 @@ class VotesManager {
         department.votesData = {};
         console.log(`All votes cleared in department ${departmentId}.`);
         return true;
+    }
+
+    // Check if a nickname is taken in a department
+    isNicknameTaken(departmentId, nickname) {
+        const department = departments.get(departmentId);
+        if (!department) return false;
+        for (let userId of department.members) {
+            const user = usersData[userId];
+            if (user && user.nickname === nickname) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Check if a department has members
+    hasMembers(departmentId) {
+        const department = departments.get(departmentId);
+        return department && department.members.size > 0;
+    }
+
+    // Remove a department
+    removeDepartment(departmentId) {
+        if (departments.has(departmentId)) {
+            departments.delete(departmentId);
+            console.log(`Department ${departmentId} has been removed as it has no members.`);
+        }
     }
 }
 

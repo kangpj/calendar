@@ -40,12 +40,31 @@ wss.on('connection', (ws, req) => {
             if (parsedMessage.type === 'init') {
 
                 currentClientId = parsedMessage.clientId;
-                console.log(`#${logSeq++} New client connected: from ${currentClientId}` );
+                console.log(`#${logSeq++} New client initialized with clientId: ${currentClientId}` );
+                
+                // Check if userId exists for clientId
+                if (!usersData[currentClientId]) {
+                    // Generate a new userId for anonymous user
+                    const newUserId = generateUserId();
+                    usersData[currentClientId] = { 
+                        userId: newUserId, 
+                        isAnonymous: true,
+                        passkey: null // Passkey 초기화
+                    };
+                    console.log(`Assigned new anonymous userId: ${newUserId} to clientId: ${currentClientId}`);
+                    
+                    // Broadcast to default department about the new anonymous user without clientId
+                    broadcastDepartmentMessage('default', {
+                        type: 'newClient',
+                        data: { userId: newUserId, department: 'default' }
+                    });
+                }
+
                 client[currentClientId] = {
                     ws:             ws,
                     ip:             currentClientIP,
                     secretNumber:   generateClientSecret(currentClientId),
-                    department:     'default'
+                    department:     'default' // 부서 필드 추가
                 };
                 clients.push(client);
                 // The very first message with vote status to the newly connected client
@@ -54,18 +73,54 @@ wss.on('connection', (ws, req) => {
                     data: votesManager.getDefaultDepartment() 
                 }));
 
-                // default 부서의 모든 클라이언트에게 새로운 클라이언트 접속 방송
+                // default 부서의 모든 클라이언트에게 새로운 클라이언트 접속 방송 (clientId 제거)
                 broadcastDepartmentMessage('default', {
                     type: 'newClient',
-                    data: { clientId: currentClientId }
+                    data: { userId: usersData[currentClientId].userId, department: 'default' }
                 });
+            } else if (parsedMessage.type === 'signIn') {
+                const { department, nickname } = parsedMessage.data;
+                const passkey = generatePasskey(); // 서버에서 패스키 생성
+
+                if (!isUserSignedIn(currentClientId)) {
+                    // 최초 로그인 시 패스키 저장
+                    handleInitialSignIn(ws, department, nickname, passkey);
+                } else {
+                    // 부서 또는 닉네임 변경 시 패스키 인증
+                    const providedPasskey = parsedMessage.data.passkey;
+                    handleChangeSignIn(ws, department, nickname, providedPasskey);
+                }
+
+            } else if (parsedMessage.type === 'logout') {
+                if (currentUserId) {
+                    console.log('Logging for debug:(logout) ', currentUserId);
+                    // 클라이언트의 userId와 부서를 가져옴
+                    const user = usersData[currentClientId];
+                    if (user) {
+                        const { department } = user;
+                        delete usersData[currentClientId];
+                        votesManager.removeUserFromDepartment(department, currentUserId);
+                        currentUserId = null;
+
+                        // 부서에 사용자가 더 이상 없으면 부서 데이터 제거
+                        if (!votesManager.hasMembers(department)) {
+                            votesManager.removeDepartment(department);
+                        }
+
+                        // 부서에 사용자가 로그아웃했음을 방송 (clientId 제거)
+                        broadcastDepartmentMessage(department, {
+                            type: 'userLoggedOut',
+                            data: { userId: user.userId, department }
+                        });
+                    }
+                }
             } else if (parsedMessage.type === 'ping') {
                 ws.send(JSON.stringify({
                     type: 'pong'
                 }));
             } else if (parsedMessage.type === 'vote') {
                 const { year, month, day, userId } = parsedMessage.data;
-                console.log('Logging for debug:(vote) ', userId);
+                console.log(`#${logSeq++} Debug:(vote) clientId>${currentClientId} userId>${userId}` );
 
                 // Register vote in votesManager for the specific department
                 votesManager.toggleVote(currentDepartment, year, month, day, userId);
@@ -97,33 +152,7 @@ wss.on('connection', (ws, req) => {
                            theDay: theDay}
                 }));
 
-            } else if (parsedMessage.type === 'signIn') {
-                const { userId, department, nickname } = parsedMessage.data;
-                usersData[userId] = { department, nickname, isManager: false };
-                currentUserId = userId;
-                currentDepartment = department; // Set current department
-
-                // 클라이언트 객체에 부서 정보 업데이트
-                if (client[currentClientId]) {
-                    client[currentClientId].department = department;
-                }
-
-                // Assign manager if first user in department
-                if (votesManager.isFirstUserInDepartment(department)) {
-                    usersData[userId].isManager = true;
-                    votesManager.assignDepartmentManager(department, userId);
-                    ws.send(JSON.stringify({ type: 'managerAuthenticated' }));
-                }
-
-                console.log('User signed in:', usersData[userId]);
-
-            } else if (parsedMessage.type === 'logout') {
-                if (currentUserId) {
-                    console.log('Logging for debug:(logout) ', currentUserId);
-                    delete usersData[currentUserId];
-                    currentUserId = null;
-                }
-            } else if (parsedMessage.type === 'resetVotes' && usersData[currentUserId]?.isManager) {
+            } else if (parsedMessage.type === 'resetVotes' && usersData[currentClientId]?.isManager) {
                 votesManager.clearAllVotes(currentDepartment);
                 broadcastDepartmentMessage(currentDepartment, {
                     type: 'updateVotes',
@@ -147,7 +176,7 @@ wss.on('connection', (ws, req) => {
                     // Private message to specific users
                     const recipients = votesManager.sendMessage(currentDepartment, senderId, recipientIds, chatMessage);
                     recipients.forEach(recipient => {
-                        const recipientClient = clients.find(client => client.clientId === recipient.userId);
+                        const recipientClient = clients.find(client => client[recipient.userId]);
                         if (recipientClient && recipientClient.ws.readyState === WebSocket.OPEN) {
                             recipientClient.ws.send(JSON.stringify(chatData));
                         }
@@ -199,6 +228,7 @@ function verifyAndDecouple(clientId, providedSecret) {
     }
 }
 
+// BroadcastDepartmentMessage 함수 수정: clientId 제거
 function broadcastDepartmentMessage(department, message) {
     const messageString = JSON.stringify(message);
     clients.forEach(clientObj => {
@@ -219,55 +249,127 @@ server.listen(3000, () => {
     console.log('Server running on port 3000');
 });
 
-
-/*
-let usersData = {}; // Stores { clientId: { token, userId, nickname, department, role } }
-
-// Helper functions
-function generateId() {
-    return crypto.randomBytes(16).toString('hex');
+// 유저 ID 생성 함수 추가
+function generateUserId() {
+    return 'user_' + Math.random().toString(36).substr(2, 9);
 }
 
-function generateToken() {
-    return crypto.randomBytes(24).toString('hex');
+// 패스키 유효성 검사 함수 추가 (예시)
+function isValidPasskey(passkey) {
+    const validPasskeys = ['secret123', 'adminPass', 'passkey456']; // 실제로는 더 안전한 방법을 사용하세요
+    return validPasskeys.includes(passkey); 
 }
 
-// Handle WebSocket connections
-wss.on('connection', (ws) => {
-    console.log('New client connected');
+// 패스키 생성 함수 추가
+function generatePasskey() {
+    const passkey = Math.random().toString(36).substr(2, 12); // 12자리 랜덤 문자열
+    return passkey;
+}
 
-    // Step 1: Generate a clientId and token, send it to the client
-    const clientId = generateId();
-    const token = generateToken();
-    usersData[clientId] = { token, role: 'guest' }; // Default role for new users
+// 함수 추가: 초기 로그인 처리
+function handleInitialSignIn(ws, department, nickname, passkey) {
+    // department-nickname 쌍의 유일성 확인
+    if (votesManager.isNicknameTaken(department, nickname)) {
+        ws.send(JSON.stringify({ type: 'signInFailed', message: '이미 사용 중인 부서-닉네임 조합입니다.' }));
+        return;
+    }
 
-    ws.clientId = clientId; // Attach clientId to the WebSocket session
-    ws.send(JSON.stringify({ type: 'init', clientId, token }));
+    // 기존 익명 사용자의 userId 업데이트
+    const existingUser = usersData[currentClientId];
+    if (existingUser && existingUser.isAnonymous) {
+        existingUser.userId = generateUserId();
+        existingUser.isAnonymous = false;
+        existingUser.department = department;
+        existingUser.nickname = nickname;
+        existingUser.passkey = passkey; // passkey 저장
+    } else {
+        // 새로운 사용자 등록
+        usersData[currentClientId] = { 
+            userId: generateUserId(), 
+            department, 
+            nickname, 
+            isManager: false,
+            passkey: passkey // passkey 저장
+        };
+    }
 
-    // Listen for messages from the client
-    ws.on('message', (message) => {
-        const data = JSON.parse(message);
+    currentUserId = usersData[currentClientId].userId;
+    currentDepartment = department;
 
-        // Step 2: Initialize userId, nickname, etc., based on client response
-        if (data.type === 'initializeUser' && data.clientId === ws.clientId) {
-            const { uniqueUserId, nickname, department } = data;
-            usersData[clientId] = {
-                ...usersData[clientId],
-                userId: uniqueUserId,
-                nickname,
-                department,
-                role: department ? 'departmentUser' : 'guest',
-            };
-            console.log(`User initialized: ${JSON.stringify(usersData[clientId])}`);
+    // 클라이언트 객체에 부서 정보 업데이트
+    if (client[currentClientId]) {
+        client[currentClientId].department = department;
+    }
 
-            // Acknowledge successful initialization
-            ws.send(JSON.stringify({ type: 'userInitialized', status: 'success' }));
+    // 부서에 사용자 추가 및 매니저 할당
+    votesManager.addUserToDepartment(department, currentUserId);
+    if (votesManager.isFirstUserInDepartment(department)) {
+        usersData[currentClientId].isManager = true;
+        votesManager.assignDepartmentManager(department, currentUserId);
+        ws.send(JSON.stringify({ type: 'managerAuthenticated', passkey })); // passkey 전달
+    } else {
+        ws.send(JSON.stringify({ type: 'userInitialized', passkey })); // passkey 전달
+    }
+
+    // 부서에 새로운 사용자가 추가되었음을 방송 (clientId 제거)
+    broadcastDepartmentMessage(department, {
+        type: 'newUser',
+        data: { userId: currentUserId, nickname, department }
+    });
+
+    console.log('User signed in:', usersData[currentClientId]);
+}
+
+// 함수 추가: 부서/닉네임 변경 시 패스키 인증 및 이전 데이터 제거
+function handleChangeSignIn(ws, newDepartment, newNickname, providedPasskey) {
+    const user = usersData[currentClientId];
+    if (!user) {
+        ws.send(JSON.stringify({ type: 'signInFailed', message: '사용자 데이터가 존재하지 않습니다.' }));
+        return;
+    }
+
+    // 현재 부서와 닉네임과 다를 경우
+    if (user.department !== newDepartment || user.nickname !== newNickname) {
+        // 패스키 검증
+        if (user.passkey !== providedPasskey) {
+            ws.send(JSON.stringify({ type: 'signInFailed', message: '패스키 인증에 실패했습니다.' }));
+            return;
         }
-    });
 
-    ws.on('close', () => {
-        console.log(`Client with clientId ${ws.clientId} disconnected`);
-        delete usersData[ws.clientId];
-    });
-});
-*/
+        // 부서-닉네임 쌍의 유일성 확인
+        if (votesManager.isNicknameTaken(newDepartment, newNickname)) {
+            ws.send(JSON.stringify({ type: 'signInFailed', message: '이미 사용 중인 부서-닉네임 조합입니다.' }));
+            return;
+        }
+
+        // 이전 부서에서 사용자 제거
+        const oldDepartment = user.department;
+        const userId = user.userId;
+        votesManager.removeUserFromDepartment(oldDepartment, userId);
+
+        // 부서에 사용자가 더 이상 없으면 부서 데이터 제거
+        if (!votesManager.hasMembers(oldDepartment)) {
+            votesManager.removeDepartment(oldDepartment);
+        }
+
+        // 새 부서에 사용자 추가
+        user.department = newDepartment;
+        user.nickname = newNickname;
+        votesManager.addUserToDepartment(newDepartment, userId);
+
+        // 매니저 할당
+        if (votesManager.isFirstUserInDepartment(newDepartment)) {
+            user.isManager = true;
+            votesManager.assignDepartmentManager(newDepartment, userId);
+            ws.send(JSON.stringify({ type: 'managerAuthenticated', passkey: user.passkey }));
+        }
+
+        // 부서 변경을 방송 (clientId 제거)
+        broadcastDepartmentMessage(newDepartment, {
+            type: 'newUser',
+            data: { userId: userId, nickname: newNickname, department: newDepartment }
+        });
+
+        console.log('User changed department/nickname:', usersData[currentClientId]);
+    }
+}

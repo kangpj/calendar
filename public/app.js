@@ -73,7 +73,24 @@ socket.onmessage = (event) => {
         document.getElementById('key').style.display = 'none';
         document.getElementById('lock').style.display = 'block';
         document.getElementById('resetVotesBtn').style.display = 'block';
-        alert('성공적으로 로그인되었습니다.');
+        alert(`성공적으로 로그인되었습니다.\n패스키: ${message.passkey}`);
+        localStorage.setItem('userId', getToken('clientId')); // userId 저장
+        localStorage.setItem('passkey', message.passkey); // 패스키 저장
+    } else if (message.type === 'signInFailed') {
+        // 로그인 실패 시 처리
+        console.log('Sign in failed:', message.message);
+    } else if (message.type === 'newClient') {
+        // default 부서의 새로운 클라이언트 접속 처리
+        console.log(`New anonymous user connected: ${message.data.userId}`);
+        // 필요에 따라 UI 업데이트
+    } else if (message.type === 'newUser') {
+        // 동일 부서의 새로운 사용자 접속 처리
+        console.log(`New user signed in: ${message.data.nickname} (${message.data.userId}) in department ${message.data.department}`);
+        addUserToUI(message.data);
+    } else if (message.type === 'userLoggedOut') {
+        // 부서 내 사용자가 로그아웃했을 때 처리
+        console.log(`User logged out: ${message.data.userId} from department ${message.data.department}`);
+        removeUserFromUI(message.data.userId);
     } else if (message.type === 'pong') {
         console.log(`#${appSeq++} Received pong from server`);
     }
@@ -114,73 +131,10 @@ calendar.addEventListener('click', (e) => {
 // Generate a user ID if it doesn’t exist in localStorage
 function getToken(tokenName) {
     if (!localStorage.getItem(tokenName)) {
-        localStorage.setItem(tokenName, 'user' + Math.random().toString(36).substr(2, 9));
+        localStorage.setItem(tokenName, 'client_' + Math.random().toString(36).substr(2, 9));
     }
     return localStorage.getItem(tokenName);
 }
-
-
-// Render calendar based on data received
-/*
-function renderCalendar(containerId, calendarData) {
-    const calendarContainer = document.getElementById(containerId);
-    calendarContainer.innerHTML = '';
-
-    const key = `${workingYear}-${workingMonth}`;
-
-    // Find the day with the most votes
-    if (calendarData[key]) {
-        calendarData[key].weeks.forEach(week => {
-            week.forEach(day => {
-                if (day && day.votes.length > maxVotes) {
-                    maxVotes = day.votes.length;
-                    mostVotedDay = day.date;
-                }
-            });
-        });
-    }
-
-    const weekDayRow = document.createElement('div');
-    weekDayRow.className = 'week';
-    const weekDays = ['일', '월', '화', '수', '목', '금', '토'];
-    weekDays.forEach(day => {
-        const dayHeader = document.createElement('div');
-        dayHeader.className = 'day-header';
-        dayHeader.innerText = day;
-        weekDayRow.appendChild(dayHeader);
-    }); 
-    calendarContainer.appendChild(weekDayRow);
-
-    // Render the calendar as a grid of weeks
-    calendarData[key]?.weeks.forEach(week => {
-        const weekRow = document.createElement('div');
-        weekRow.className = 'week';
-
-        week.forEach(day => {
-            const dayCell = document.createElement('div');
-            dayCell.className = 'day';
-
-            if (day === null) {
-                dayCell.classList.add('empty-day');
-            } else {
-                dayCell.innerText = day.date;
-                dayCell.dataset.day = day.date;
-
-                // Set background color based on votes count
-                const votesCount = day.votes.length;
-                dayCell.style.backgroundColor = `rgba(0, 255, 0, ${Math.min(votesCount / 10, 1)})`;
-
-                // Highlight the most voted day
-                if (day.date === mostVotedDay) {
-                    dayCell.classList.add('highlight');
-                }
-            }
-            weekRow.appendChild(dayCell);
-        });
-        calendarContainer.appendChild(weekRow);
-    });
-}
-*/
 
 function attemptReconnect() {
     setTimeout(() => {
@@ -249,7 +203,25 @@ document.getElementById('send-chat-btn').addEventListener('click', () => {
     }
 });
 
-// 'key' div를 클릭했을 때 authModal을 표시하도록 이벤트 리스너 추가
+// 'key' div를 클릭했을 때 authModal을 표시��도록 이벤트 리스너 추가
 document.getElementById('key').addEventListener('click', () => {
     document.getElementById('authModal').style.display = 'block';
 });
+
+// 사용자 목록 UI 업데이트 함수 추가
+function addUserToUI(userData) {
+    const userList = document.getElementById('userList');
+    if (!userList) return;
+
+    const userItem = document.createElement('li');
+    userItem.id = `${userData.userId}`;
+    userItem.textContent = `${userData.nickname}`;
+    userList.appendChild(userItem);
+}
+
+function removeUserFromUI(userId) {
+    const userItem = document.getElementById(`${userId}`);
+    if (userItem) {
+        userItem.remove();
+    }
+}

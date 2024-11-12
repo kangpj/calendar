@@ -212,3 +212,6 @@ function updateWorkingCalendar(year, month, votesData) {
         });
     });
 }
+
+// 추가: 새로운 사용자가 부서에 추가되었음을 처리하는 함수
+// 이미 public/app.js에서 처리하고 있으므로 이 부분은 생략 가능
