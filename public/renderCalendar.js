@@ -77,33 +77,30 @@ function renderCalendar(containerId, votesData) {
         week.forEach(day => {
             const dayCell = document.createElement('li');
             
-            //dayCell.className = 'day';
-
             if (day === null) {
                 dayCell.classList.add('empty-day');
             } else {
-
-                thisDate = new Date(monthData.year, monthData.month, day.date);
+                const cellDate = new Date(monthData.year, monthData.month - 1, day.date);
                 const num = document.createElement('span');
-                if (marks.indexOf(day.date) > -1) {
-                    num.innerText = `[${day.date}]`;
-                } else {
-                    num.innerText = day.date;
-                }
-                // Highlight the most voted day 
-                if (day.date === mostVotedDay) { 
-                    num.classList.add('highlight');
-                }
-                dayCell.appendChild(num);
+                num.innerText = day.date;
                 
-                // Attach event listener for voting
-                if (thisDate > today) {
-                    dayCell.addEventListener('click', () => handleDayClick(day.date));
-                    // Server side filtering is needed to escalate input value validation.
+                if (day.disabled) {
+                    dayCell.classList.add('disabled-day');
+                } else {
+                    // Highlight the most voted day 
+                    if (day.date === mostVotedDay) { 
+                        num.classList.add('highlight');
+                    }
+                    // Attach event listener for voting
+                    if (cellDate >= today) {
+                        dayCell.addEventListener('click', () => handleDayClick(day.date));
+                    }
+                    // Set background color based on votes count
+                    const votesCount = day.votes.length || 0;
+                    dayCell.style.backgroundColor = `rgba(0, 255, 0, ${Math.min(votesCount / 10, 1)})`;
                 }
-                // Set background color based on votes count
-                const votesCount = day.votes.length || 0;
-                dayCell.style.backgroundColor = `rgba(0, 255, 0, ${Math.min(votesCount / 10, 1)})`;
+
+                dayCell.appendChild(num);
             }
 
             daysContainer.appendChild(dayCell);
@@ -116,14 +113,11 @@ function renderCalendar(containerId, votesData) {
 // Helper function to navigate months
 function navigateMonth(offset) {
     workingMonth += offset;
-//    hMonth += offset;  
     if (workingMonth < 1) {
         workingMonth = 12;
-//        hMonth = 12;
         workingYear--;
     } else if (workingMonth > 12) {
         workingMonth = 1;
-//        hMonth = 1;
         workingYear++;
     }
     loadMonth(workingYear, workingMonth);
@@ -138,12 +132,20 @@ function loadMonth(year, month) {
     console.log(`#${appSeq++} send a <vote> message`);
 }
 
-
 // Send vote to WebSocket without toggling previous selections
 function handleDayClick(day) {
+    const selectedDate = new Date(workingYear, workingMonth - 1, day);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // 오늘 날짜의 시간을 00:00:00으로 설정
+
+    if (selectedDate < today) {
+        alert('과거 날짜에는 투표할 수 없습니다.');
+        return;
+    }
+
     socket.send(JSON.stringify({ 
-    type: 'vote',
-    data: { year: workingYear, month: workingMonth, day: parseInt(day), userId: getToken('userId') }
+        type: 'vote',
+        data: { year: workingYear, month: workingMonth, day: parseInt(day), userId: getToken('userId') }
     }));
 }
 
@@ -161,15 +163,28 @@ function createMonthCalendar(year, month) {
     let week = new Array(7).fill(null);
     let day = 1;
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // 오늘 날짜의 시간을 00:00:00으로 설정
+
     for (let i = firstDay; i < 7 && day <= lastDay; i++) {
-        week[i] = { date: day++, votes: [] };
+        const cellDate = new Date(year, month - 1, day);
+        if (cellDate < today) {
+            week[i] = { date: day++, votes: [], disabled: true }; // 과거 날짜 표시
+        } else {
+            week[i] = { date: day++, votes: [], disabled: false };
+        }
     }
     calendar.push(week);
 
     while (day <= lastDay) {
         week = new Array(7).fill(null);
         for (let i = 0; i < 7 && day <= lastDay; i++) {
-            week[i] = { date: day++, votes: [] };
+            const cellDate = new Date(year, month - 1, day);
+            if (cellDate < today) {
+                week[i] = { date: day++, votes: [], disabled: true }; // 과거 날짜 표시
+            } else {
+                week[i] = { date: day++, votes: [], disabled: false };
+            }
         }
         calendar.push(week);
     }
@@ -198,6 +213,7 @@ function updateWorkingCalendar(year, month, votesData) {
                 
                 if (votesData[dateKey]) {
                     try {
+                        // 클라이언트 Set에 유저 ID 추가
                         votesData[dateKey].forEach(userId => clients.add(userId));
                         cell.votes = votesData[dateKey];
                         if (cell.votes.length > maxVotes) {
