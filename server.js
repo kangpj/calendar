@@ -247,13 +247,6 @@ wss.on('connection', (ws, req) => {
         });
     }
 
-    // 정적 파일 제공 (예: 프론트엔드 HTML 및 JS 파일)
-    app.use(express.static('public'));
-
-    // 서버 시작
-    server.listen(3000, () => {
-        console.log('서버가 포트 3000에서 실행 중입니다.');
-    });
 
     // 유저 ID 생성 함수
     function generateUserId() {
@@ -402,4 +395,12 @@ const interval = setInterval(() => {
 
 wss.on('close', () => {
     clearInterval(interval);
+});
+
+// 정적 파일 제공 (예: 프론트엔드 HTML 및 JS 파일)
+app.use(express.static('public'));
+
+// 서버 시작
+server.listen(3000, () => {
+    console.log('서버가 포트 3000에서 실행 중입니다.');
 });
