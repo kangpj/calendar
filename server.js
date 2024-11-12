@@ -22,6 +22,12 @@ let month = new Date().getMonth();
 // votesManager.toggleVote(year, month);
 let logSeq = 0;
 
+// isUserSignedIn 함수 추가
+function isUserSignedIn(clientId) {
+    const user = usersData[clientId];
+    return user && !user.isAnonymous;
+}
+
 wss.on('connection', (ws, req) => {
 
     // indivisual clients' properties
