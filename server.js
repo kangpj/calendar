@@ -8,17 +8,17 @@ const votesManager = require('./votesManager');
 
 
 let usersData = {}; 
-// Stores { clientId: { token, userId, nickname, department, role } }
+// Stores { clientId: { token, userId, nickname, department, role, isAnonymous, passkey } }
 
 const clients = [];
 // key: websocket
-// data: { IPaddress, secretNumber, clientId }
+// data: { IPaddress, secretNumber, clientId, department }
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 let year = new Date().getFullYear();
-let month = new Date().getMonth();
+let month = new Date().getMonth() + 1; // 1-12 범위로 수정
 // votesManager.toggleVote(year, month);
 let logSeq = 0;
 
@@ -90,16 +90,16 @@ wss.on('connection', (ws, req) => {
 
                 if (!isUserSignedIn(currentClientId)) {
                     // 최초 로그인 시 패스키 저장
-                    handleInitialSignIn(ws, department, nickname, passkey);
+                    handleInitialSignIn(ws, currentClientId, department, nickname, passkey);
                 } else {
                     // 부서 또는 닉네임 변경 시 패스키 인증
                     const providedPasskey = parsedMessage.data.passkey;
-                    handleChangeSignIn(ws, department, nickname, providedPasskey);
+                    handleChangeSignIn(ws, currentClientId, department, nickname, providedPasskey);
                 }
 
             } else if (parsedMessage.type === 'logout') {
                 if (currentUserId) {
-                    console.log(`#${logSeq++} Debug:(logout) clientId>${currentClientId} userId>${userId}` );
+                    console.log(`#${logSeq++} Debug:(logout) clientId>${currentClientId} userId>${currentUserId}` );
                     // 클라이언트의 userId와 부서를 가져옴
                     const user = usersData[currentClientId];
                     if (user) {
@@ -182,9 +182,9 @@ wss.on('connection', (ws, req) => {
                     // Private message to specific users
                     const recipients = votesManager.sendMessage(currentDepartment, senderId, recipientIds, chatMessage);
                     recipients.forEach(recipient => {
-                        const recipientClient = clients.find(client => client[recipient.userId]);
-                        if (recipientClient && recipientClient.ws.readyState === WebSocket.OPEN) {
-                            recipientClient.ws.send(JSON.stringify(chatData));
+                        const recipientClientObj = clients.find(clientObj => clientObj[recipient.userId]);
+                        if (recipientClientObj && recipientClientObj.ws.readyState === WebSocket.OPEN) {
+                            recipientClientObj.ws.send(JSON.stringify(chatData));
                         }
                     });
                 } else {
@@ -273,7 +273,7 @@ function generatePasskey() {
 }
 
 // 함수 추가: 초기 로그인 처리
-function handleInitialSignIn(ws, department, nickname, passkey) {
+function handleInitialSignIn(ws, clientId, department, nickname, passkey) {
     // department-nickname 쌍의 유일성 확인
     if (votesManager.isNicknameTaken(department, nickname)) {
         ws.send(JSON.stringify({ type: 'signInFailed', message: '이미 사용 중인 부서-닉네임 조합입니다.' }));
@@ -281,7 +281,7 @@ function handleInitialSignIn(ws, department, nickname, passkey) {
     }
 
     // 기존 익명 사용자의 userId 업데이트
-    const existingUser = usersData[currentClientId];
+    const existingUser = usersData[clientId];
     if (existingUser && existingUser.isAnonymous) {
         existingUser.userId = generateUserId();
         existingUser.isAnonymous = false;
@@ -290,7 +290,7 @@ function handleInitialSignIn(ws, department, nickname, passkey) {
         existingUser.passkey = passkey; // passkey 저장
     } else {
         // 새로운 사용자 등록
-        usersData[currentClientId] = { 
+        usersData[clientId] = { 
             userId: generateUserId(), 
             department, 
             nickname, 
@@ -299,36 +299,36 @@ function handleInitialSignIn(ws, department, nickname, passkey) {
         };
     }
 
-    currentUserId = usersData[currentClientId].userId;
+    currentUserId = usersData[clientId].userId;
     currentDepartment = department;
 
     // 클라이언트 객체에 부서 정보 업데이트
-    if (client[currentClientId]) {
-        client[currentClientId].department = department;
+    if (client[clientId]) {
+        client[clientId].department = department;
     }
 
     // 부서에 사용자 추가 및 매니저 할당
     votesManager.addUserToDepartment(department, currentUserId);
     if (votesManager.isFirstUserInDepartment(department)) {
-        usersData[currentClientId].isManager = true;
+        usersData[clientId].isManager = true;
         votesManager.assignDepartmentManager(department, currentUserId);
         ws.send(JSON.stringify({ type: 'managerAuthenticated', passkey })); // passkey 전달
     } else {
         ws.send(JSON.stringify({ type: 'userInitialized', passkey })); // passkey 전달
     }
 
-    // 부서에 새로운 사용자가 추가되었음을 방송 (clientId 제거)
+    // 부서에 새로운 사용자가 추가되었음을 방송
     broadcastDepartmentMessage(department, {
         type: 'newUser',
         data: { userId: currentUserId, nickname, department }
     });
 
-    console.log('User signed in:', usersData[currentClientId]);
+    console.log('User signed in:', usersData[clientId]);
 }
 
 // 함수 추가: 부서/닉네임 변경 시 패스키 인증 및 이전 데이터 제거
-function handleChangeSignIn(ws, newDepartment, newNickname, providedPasskey) {
-    const user = usersData[currentClientId];
+function handleChangeSignIn(ws, clientId, newDepartment, newNickname, providedPasskey) {
+    const user = usersData[clientId];
     if (!user) {
         ws.send(JSON.stringify({ type: 'signInFailed', message: '사용자 데이터가 존재하지 않습니다.' }));
         return;
@@ -370,12 +370,12 @@ function handleChangeSignIn(ws, newDepartment, newNickname, providedPasskey) {
             ws.send(JSON.stringify({ type: 'managerAuthenticated', passkey: user.passkey }));
         }
 
-        // 부서 변경을 방송 (clientId 제거)
+        // 부서 변경을 방송
         broadcastDepartmentMessage(newDepartment, {
             type: 'newUser',
             data: { userId: userId, nickname: newNickname, department: newDepartment }
         });
 
-        console.log('User changed department/nickname:', usersData[currentClientId]);
+        console.log('User changed department/nickname:', usersData[clientId]);
     }
 }
