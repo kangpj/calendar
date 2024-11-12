@@ -93,7 +93,7 @@ wss.on('connection', (ws, req) => {
 
             } else if (parsedMessage.type === 'logout') {
                 if (currentUserId) {
-                    console.log('Logging for debug:(logout) ', currentUserId);
+                    console.log(`#${logSeq++} Debug:(logout) clientId>${currentClientId} userId>${userId}` );
                     // 클라이언트의 userId와 부서를 가져옴
                     const user = usersData[currentClientId];
                     if (user) {

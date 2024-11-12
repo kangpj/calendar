@@ -143,7 +143,7 @@ function loadMonth(year, month) {
 function handleDayClick(day) {
     socket.send(JSON.stringify({ 
     type: 'vote',
-    data: { year: workingYear, month: workingMonth, day: parseInt(day), clientId: getToken('clientId') }
+    data: { year: workingYear, month: workingMonth, day: parseInt(day), userId: getToken('userId') }
     }));
 }
 
