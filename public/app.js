@@ -12,6 +12,7 @@ const eMostVotedDay = document.getElementById('mostVotedDay');
 const wsStatus      = document.getElementById('wsStatus');
 const caption       = document.getElementById('caption');
 
+
 const calendars     = {};
 const users         = new Set();
 const clients       = new Set();
