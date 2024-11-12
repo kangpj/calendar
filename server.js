@@ -7,10 +7,18 @@ const app = express();
 const votesManager = require('./votesManager'); 
 
 let usersData = {}; 
+<<<<<<< HEAD
 // Stores { clientId: { userId, nickname, department, isManager, isAnonymous, passkey } }
 
 const clients = [];
 // Array of client objects: { clientId: { ws, ip, secretNumber, department } }
+=======
+// Stores { clientId: { userId, isAnonymous, passkey, department, nickname, isManager } }
+
+const clients = new Map();
+// key: clientId
+// value: { ws, ip, secretNumber, department }
+>>>>>>> 630968968eac1f5d09fa302bc0080dff53142768
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -28,8 +36,6 @@ function isUserSignedIn(clientId) {
 
 wss.on('connection', (ws, req) => {
 
-    // indivisual clients' properties
-    const client = {};
     const currentClientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     let currentClientId = null;
     let currentUserId = null;
@@ -45,7 +51,11 @@ wss.on('connection', (ws, req) => {
 
                 currentClientId = parsedMessage.clientId;
                 console.log(`#${logSeq++} New client initialized with clientId: ${currentClientId}`);
+<<<<<<< HEAD
                 
+=======
+
+>>>>>>> 630968968eac1f5d09fa302bc0080dff53142768
                 // Check if userId exists for clientId
                 if (!usersData[currentClientId]) {
                     // Generate a new userId for anonymous user
@@ -64,21 +74,27 @@ wss.on('connection', (ws, req) => {
                     });
                 }
 
-                client[currentClientId] = {
+                // Create client object and add to clients Map
+                const clientObj = {
                     ws:             ws,
                     ip:             currentClientIP,
                     secretNumber:   generateClientSecret(currentClientId),
                     department:     'default' // 부서 필드 추가
                 };
+<<<<<<< HEAD
                 clients.push(client);
 
+=======
+                clients.set(currentClientId, clientObj);
+                
+>>>>>>> 630968968eac1f5d09fa302bc0080dff53142768
                 // The very first message with vote status to the newly connected client
                 ws.send(JSON.stringify({
                     type: 'updateVotes',
                     data: votesManager.getDefaultDepartment() 
                 }));
 
-                // default 부서의 모든 클라이언트에게 새로운 클라이언트 접속 방송 (clientId 제거)
+                // Broadcast to default department
                 broadcastDepartmentMessage('default', {
                     type: 'newClient',
                     data: { userId: usersData[currentClientId].userId, department: 'default' }
@@ -102,9 +118,9 @@ wss.on('connection', (ws, req) => {
                     // 클라이언트의 userId와 부서를 가져옴
                     const user = usersData[currentClientId];
                     if (user) {
-                        const { department } = user;
+                        const { department, userId } = user;
                         delete usersData[currentClientId];
-                        votesManager.removeUserFromDepartment(department, currentUserId);
+                        votesManager.removeUserFromDepartment(department, userId);
                         currentUserId = null;
 
                         // 부서에 사용자가 더 이상 없으면 부서 데이터 제거
@@ -112,11 +128,14 @@ wss.on('connection', (ws, req) => {
                             votesManager.removeDepartment(department);
                         }
 
-                        // 부서에 사용자가 로그아웃했음을 방송 (clientId 제거)
+                        // 부서에 사용자가 로그아웃했음을 방송
                         broadcastDepartmentMessage(department, {
                             type: 'userLoggedOut',
-                            data: { userId: user.userId, department }
+                            data: { userId: userId, department }
                         });
+
+                        // Remove from clients Map
+                        clients.delete(currentClientId);
                     }
                 }
             } else if (parsedMessage.type === 'ping') {
@@ -126,7 +145,11 @@ wss.on('connection', (ws, req) => {
             } else if (parsedMessage.type === 'vote') {
                 const { year, month, day, userId } = parsedMessage.data;
                 console.log(`#${logSeq++} Debug:(vote) clientId>${currentClientId} userId>${userId}`);
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 630968968eac1f5d09fa302bc0080dff53142768
                 // Register vote in votesManager for the specific department
                 votesManager.toggleVote(currentDepartment, year, month, day, userId);
                 
@@ -152,11 +175,13 @@ wss.on('connection', (ws, req) => {
                 // unicast
                 ws.send(JSON.stringify({
                     type: 'updateVoteStatistic',
-                    data: {votersTotal: votesManager.getUniqueVoters(),
-                           availableTotal: theNumber, 
-                           theDay: theDay}
+                    data: {
+                        votersTotal: votesManager.getUniqueVoters(),
+                        availableTotal: theNumber, 
+                        theDay: theDay
+                    }
                 }));
-
+    
             } else if (parsedMessage.type === 'resetVotes' && usersData[currentClientId]?.isManager) {
                 votesManager.clearAllVotes(currentDepartment);
                 broadcastDepartmentMessage(currentDepartment, {
@@ -181,11 +206,15 @@ wss.on('connection', (ws, req) => {
                     // Private message to specific users
                     const recipients = votesManager.sendMessage(currentDepartment, senderId, recipientIds, chatMessage);
                     recipients.forEach(recipient => {
+<<<<<<< HEAD
                         // Find client object for recipient.userId
                         const recipientClientObj = clients.find(clientObj => {
                             return Object.values(clientObj).some(client => client.department === currentDepartment && client.userId === recipient.userId);
                         });
 
+=======
+                        const recipientClientObj = Array.from(clients.values()).find(clientObj => clientObj.userId === recipient.userId);
+>>>>>>> 630968968eac1f5d09fa302bc0080dff53142768
                         if (recipientClientObj && recipientClientObj.ws.readyState === WebSocket.OPEN) {
                             recipientClientObj.ws.send(JSON.stringify(chatData));
                         }
@@ -200,6 +229,7 @@ wss.on('connection', (ws, req) => {
         }
     });
 
+<<<<<<< HEAD
     ws.on('close', () => closeClient(ws, currentClientIP, currentClientId, client, currentDepartment));
 });
 
@@ -216,6 +246,22 @@ function heartbeat() {
         console.log(`Client from ${ip} disconnected from department ${department}`);
     }
 
+=======
+    // Heartbeat function to keep connections alive
+    function heartbeat() {
+        this.isAlive = true;
+    }
+
+    function closeClient(ws, ip, clientId, department) {
+
+        if (clients.has(clientId)) {
+            clients.delete(clientId);
+        }
+        ws.terminate();
+        console.log(`Client from ${ip} disconnected from department ${department}`);
+    }
+
+>>>>>>> 630968968eac1f5d09fa302bc0080dff53142768
     // Generate a unique hidden number for client verification
     function generateClientSecret(clientId) {
         const secretNumber = Math.floor(100000 + Math.random() * 900000); // 6-digit random number
@@ -228,7 +274,11 @@ function heartbeat() {
         const storedSecret = clientSecretNumbers.get(clientId);
 
         if (storedSecret && storedSecret === providedSecret) {
+<<<<<<< HEAD
             usersData.delete(clientId); // Decouple the clientId and userId
+=======
+            usersData[clientId].userId = null; // Decouple the clientId and userId
+>>>>>>> 630968968eac1f5d09fa302bc0080dff53142768
             clientSecretNumbers.delete(clientId); // Clear the secret
             return true;
         } else {
@@ -239,12 +289,19 @@ function heartbeat() {
     // BroadcastDepartmentMessage 함수 수정: clientId 제거
     function broadcastDepartmentMessage(department, message) {
         const messageString = JSON.stringify(message);
+<<<<<<< HEAD
         clients.forEach(clientObj => {
             // 각 클라이언트 객체의 부서를 확인
             for (const [clientId, client] of Object.entries(clientObj)) {
                 if (client.department === department && client.ws.readyState === WebSocket.OPEN) {
                     client.ws.send(messageString);
                 }
+=======
+        clients.forEach((clientObj, clientId) => {
+            // 각 클라이언트 객체의 부서를 확인
+            if (clientObj.department === department && clientObj.ws.readyState === WebSocket.OPEN) {
+                clientObj.ws.send(messageString);
+>>>>>>> 630968968eac1f5d09fa302bc0080dff53142768
             }
         });
     }
@@ -305,12 +362,18 @@ function heartbeat() {
         currentDepartment = department;
 
         // 클라이언트 객체에 부서 정보 업데이트
+<<<<<<< HEAD
         const clientObj = clients.find(cObj => cObj[clientId]);
         if (clientObj) {
             clientObj[clientId].department = department;
         } else {
             console.error(`Client object for clientId ${clientId} not found.`);
             return;
+=======
+        const clientObj = clients.get(clientId);
+        if (clientObj) {
+            clientObj.department = department;
+>>>>>>> 630968968eac1f5d09fa302bc0080dff53142768
         }
 
         // 부서에 사용자 추가 및 매니저 할당
@@ -330,6 +393,7 @@ function heartbeat() {
         });
 
         console.log('User signed in:', usersData[clientId]);
+<<<<<<< HEAD
     }
 
     // 함수 추가: 부서/닉네임 변경 시 패스키 인증 및 이전 데이터 제거
@@ -383,5 +447,84 @@ function heartbeat() {
             });
 
         console.log('User changed department/nickname:', usersData[clientId]);
+=======
+>>>>>>> 630968968eac1f5d09fa302bc0080dff53142768
     }
-}
+
+    // 함수 추가: 부서/닉네임 변경 시 패스키 인증 및 이전 데이터 제거
+    function handleChangeSignIn(ws, clientId, newDepartment, newNickname, providedPasskey) {
+        const user = usersData[clientId];
+        if (!user) {
+            ws.send(JSON.stringify({ type: 'signInFailed', message: '사용자 데이터가 존재하지 않습니다.' }));
+            return;
+        }
+
+        // 현재 부서와 닉네임과 다를 경우
+        if (user.department !== newDepartment || user.nickname !== newNickname) {
+            // 패스키 검증
+            if (user.passkey !== providedPasskey) {
+                ws.send(JSON.stringify({ type: 'signInFailed', message: '패스키 인증에 실패했습니다.' }));
+                return;
+            }
+
+            // 부서-닉네임 쌍의 유일성 확인
+            if (votesManager.isNicknameTaken(newDepartment, newNickname)) {
+                ws.send(JSON.stringify({ type: 'signInFailed', message: '이미 사용 중인 부서-닉네임 조합입니다.' }));
+                return;
+            }
+
+            // 이전 부서에서 사용자 제거
+            const oldDepartment = user.department;
+            const userId = user.userId;
+            votesManager.removeUserFromDepartment(oldDepartment, userId);
+
+            // 부서에 사용자가 더 이상 없으면 부서 데이터 제거
+            if (!votesManager.hasMembers(oldDepartment)) {
+                votesManager.removeDepartment(oldDepartment);
+            }
+
+            // 새 부서에 사용자 추가
+            user.department = newDepartment;
+            user.nickname = newNickname;
+            votesManager.addUserToDepartment(newDepartment, userId);
+
+            // 매니저 할당
+            if (votesManager.isFirstUserInDepartment(newDepartment)) {
+                user.isManager = true;
+                votesManager.assignDepartmentManager(newDepartment, userId);
+                ws.send(JSON.stringify({ type: 'managerAuthenticated', passkey: user.passkey }));
+            }
+
+            // 부서 변경을 방송
+            broadcastDepartmentMessage(newDepartment, {
+                type: 'newUser',
+                data: { userId: userId, nickname: newNickname, department: newDepartment }
+            });
+
+            console.log('User changed department/nickname:', usersData[clientId]);
+        }
+    }
+});
+
+// 기타 함수들 remain unchanged...
+// For example: generateUserId, isValidPasskey, generatePasskey, etc.
+
+// Function to keep WebSocket connections alive (heartbeat)
+wss.on('connection', (ws, req) => {
+    ws.isAlive = true;
+    ws.on('pong', heartbeat);
+});
+
+// Periodically check if connections are alive
+const interval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+        if (ws.isAlive === false) return ws.terminate();
+
+        ws.isAlive = false;
+        ws.ping(() => {});
+    });
+}, 30000);
+
+wss.on('close', () => {
+    clearInterval(interval);
+});
