@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const signInData = {
                 type: 'signIn',
                 data: {
+                    
                     department: department,
                     nickname: nickname
                     // passkey는 서버에서 생성되므로 클라이언트는 전송하지 않음
