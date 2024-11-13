@@ -1,7 +1,7 @@
 // public/app.js
 
 
-const socket        = new WebSocket('wss://piljoong.kr/ws/');
+let socket        = new WebSocket('wss://piljoong.kr/ws/');
 
 // UI elements
 //const calendar    = document.getElementById('calendar');
@@ -67,7 +67,7 @@ socket.onmessage = (event) => {
 
     if (message.type === 'updateVotes') {
         renderCalendar('calendar', message.data);
-        //updateVoteStatistics();
+        updateVoteStatistics();
     } else if (message.type === 'managerAuthenticated' || message.type === 'userInitialized') {
         // 로그인 성공 시 authModal 숨기기
         document.getElementById('authModal').style.display = 'none';
@@ -77,6 +77,13 @@ socket.onmessage = (event) => {
         alert(`성공적으로 로그인되었습니다.\n패스키: ${message.passkey}`);
         localStorage.setItem('userId', getToken('clientId')); // userId 저장
         localStorage.setItem('passkey', message.passkey); // 패스키 저장
+
+        // 부서 이름으로 채팅 제목 변경
+        const department = usersData[getToken('clientId')].department;
+        document.getElementById('chat-section').querySelector('h3')?.remove(); // 기존 제목 제거
+        const chatTitle = document.createElement('h3');
+        chatTitle.textContent = `${department} 부서 채팅`;
+        document.getElementById('chat-section').insertBefore(chatTitle, document.getElementById('chat-container'));
     } else if (message.type === 'signInFailed') {
         // 로그인 실패 시 처리
         console.log('Sign in failed:', message.message);
@@ -88,6 +95,12 @@ socket.onmessage = (event) => {
         // 동일 부서의 새로운 사용자 접속 처리
         console.log(`New user signed in: ${message.data.nickname} (${message.data.userId}) in department ${message.data.department}`);
         addUserToUI(message.data);
+        // 채팅 제목 업데이트 (동일 부서의 새 사용자가 있을 때 재설정)
+        const department = message.data.department;
+        document.getElementById('chat-section').querySelector('h3')?.remove(); // 기존 제목 제거
+        const chatTitle = document.createElement('h3');
+        chatTitle.textContent = `${department} 부서 채팅`;
+        document.getElementById('chat-section').insertBefore(chatTitle, document.getElementById('chat-container'));
     } else if (message.type === 'userLoggedOut') {
         // 부서 내 사용자가 로그아웃했을 때 처리
         console.log(`User logged out: ${message.data.userId} from department ${message.data.department}`);
@@ -181,10 +194,10 @@ document.getElementById('send-chat-btn').addEventListener('click', () => {
     }
 });
 
-// 'key' div를 클릭했을 때 authModal을 표시��도록 이벤트 리스너 추가
+// 'key' div를 클릭했을 때 authModal을 표시도록 이벤트 리스너 추가
 document.getElementById('key').addEventListener('click', () => {
     document.getElementById('authModal').style.display = 'block';
-    
+
 });
 
 // 사용자 목록 UI 업데이트 함수 추가

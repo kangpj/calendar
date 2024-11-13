@@ -6,6 +6,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const keyIcon = document.getElementById('key');
     const lockIcon = document.getElementById('lock');
 
+    // 로컬 스토리지에서 저장된 부서와 닉네임을 가져와 입력 필드에 채우기
+    const storedDepartment = getStoredDepartment();
+    const storedNickname = getStoredNickname();
+
+    if (storedDepartment) {
+        departmentInput.value = storedDepartment;
+    }
+
+    if (storedNickname) {
+        nicknameInput.value = storedNickname;
+    }
+
     // Show the authentication modal only when 'key' is clicked
     // 초기 로그인 시 모달을 자동으로 표시하지 않음
 
@@ -73,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 부서와 닉네임을 localStorage에 저장
             storeDepartment(nicknameInput.value.trim(), departmentInput.value.trim());
-            
+
             // 로그인 성공 시 패스키를 사용자에게 전달
             // 로그인 성공 알림 및 UI 업데이트
             alert(`성공적으로 로그인되었습니다.\n패스키: ${message.passkey}`);
