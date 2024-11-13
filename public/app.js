@@ -63,10 +63,13 @@ socket.onclose = () => {
 
 // Handle WebSocket messages
 socket.onmessage = (event) => {
-    const message = JSON.parse(event.data);
+    const message = JSON.parse(event.data);    
 
-    if (message.type === 'updateVotes') {
-        renderCalendar('calendar', message.data);
+    if (message.type === 'setUserId') {
+        localStorage.setItem('userId', message.data); 
+    } else if (message.type === 'updateVotes') {
+        const userId = getToken('userId');
+        renderCalendar('calendar', message.data, userId);
         updateVoteStatistics();
     } else if (message.type === 'managerAuthenticated' || message.type === 'userInitialized') {
         // 로그인 성공 시 authModal 숨기기
@@ -75,7 +78,7 @@ socket.onmessage = (event) => {
         document.getElementById('lock').style.display = 'block';
         document.getElementById('resetVotesBtn').style.display = 'block';
         alert(`성공적으로 로그인되었습니다.\n패스키: ${message.passkey}`);
-        localStorage.setItem('userId', getToken('clientId')); // userId 저장
+        //localStorage.setItem('userId', getToken('userId')); // userId 저장
         localStorage.setItem('passkey', message.passkey); // 패스키 저장
 
         // 부서 이름으로 채팅 제목 변경

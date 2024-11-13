@@ -1,11 +1,11 @@
 // public/renderCalendar2.js
 
 
-function renderCalendar(containerId, votesData) {
+function renderCalendar(containerId, votesData, userId) {
     const calendarContainer = document.getElementById(containerId);
     calendarContainer.innerHTML = ''; // Clear any existing content
     
-    const userId = getToken('clientId');
+    //const userId = getToken('userId');
 
     const key = cookKey(workingYear, workingMonth);
     const today = new Date();
@@ -101,7 +101,10 @@ function renderCalendar(containerId, votesData) {
 }
 
 function updateWorkingCalendar(year, month, votesData) {
-    if (!votesData) return;
+    if (!votesData) {
+        console.warn('votesData is undefined or null in updateWorkingCalendar');
+        return { mostVotedDay: null, maxVotes: 0, clientsSet: new Set() };
+    }
     
     const key = cookKey(year, month);
     if (!calendars[key]) calendars[key] = createMonthCalendar(year, month);

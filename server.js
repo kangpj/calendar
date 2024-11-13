@@ -2,6 +2,8 @@
 const http = require('http');
 const WebSocket = require('ws');
 const express = require('express');
+
+
 const app = express();
 // votesManager는 별도의 모듈
 const votesManager = require('./votesManager'); 
@@ -29,11 +31,10 @@ function isUserSignedIn(clientId) {
 
 wss.on('connection', (ws, req) => {
 
-    const currentClientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    let currentClientId = null;
-    let currentUserId = null;
-
-    let currentDepartment = 'default'; // 초기 부서를 default로 설정
+    const   currentClientIP     = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    let     currentClientId     = null;
+    let     currentUserId       = null;
+    let     currentDepartment   = 'default'; // 초기 부서를 default로 설정
 
     console.log(`#${logSeq++} New client connected: from ${currentClientIP}`);
     
@@ -56,8 +57,14 @@ wss.on('connection', (ws, req) => {
                     };
                     console.log(`Assigned new anonymous userId: ${newUserId} to clientId: ${currentClientId}`);
                     
+                    // currentUserId
+                    ws.send(JSON.stringify({
+                        type: 'setUserId',
+                        data: newUserId
+                    }));
 
                 }
+                currentUserId = usersData[currentClientId].userId;
 
                 // 클라이언트 객체 생성 및 Map에 추가
                 clients.set(currentClientId, {
@@ -69,8 +76,8 @@ wss.on('connection', (ws, req) => {
                 
                 // 최초 메시지로 투표 상태 전송
                 ws.send(JSON.stringify({
-                    type: 'updateVotes',
-                    data: votesManager.getAllVotes('default', year, month)
+                    type:   'updateVotes',
+                    data:   votesManager.getAllVotes('default', year, month)
                 }));
 
                 // default 부서의 모든 클라이언트에게 새로운 클라이언트 접속 방송
@@ -100,7 +107,7 @@ wss.on('connection', (ws, req) => {
                         const { department } = user;
                         delete usersData[currentClientId];
                         votesManager.removeUserFromDepartment(department, currentUserId);
-                        currentUserId = null;
+                        //currentUserId = null;
 
                         // 부서에 사용자가 더 이상 없으면 부서 데이터 제거
                         if (!votesManager.hasMembers(department)) {
@@ -222,7 +229,7 @@ wss.on('connection', (ws, req) => {
         // 기존 익명 사용자의 userId 업데이트
         const existingUser = usersData[clientId];
         if (existingUser && existingUser.isAnonymous) {
-            existingUser.userId = generateUserId();
+            //existingUser.userId = generateUserId();
             existingUser.isAnonymous = false;
             existingUser.department = department;
             existingUser.nickname = nickname;
@@ -238,7 +245,7 @@ wss.on('connection', (ws, req) => {
             };
         }
 
-        currentUserId = usersData[clientId].userId;
+        //currentUserId = usersData[clientId].userId;
         currentDepartment = department;
 
         // 클라이언트 객체에 부서 정보 업데이트
