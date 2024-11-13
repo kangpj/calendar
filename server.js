@@ -203,10 +203,6 @@ wss.on('connection', (ws, req) => {
 
     ws.on('close', () => closeClient(ws, currentClientIP, currentClientId, currentDepartment));
     
-    // Heartbeat 함수: 연결 유지
-    function heartbeat() {
-        this.isAlive = true;
-    }
 
     function closeClient(ws, ip, clientId, department) {
 
@@ -375,27 +371,6 @@ wss.on('connection', (ws, req) => {
     }
 });
 
-// 기타 함수들 변경 없음...
-
-// WebSocket 연결을 유지하기 위한 Heartbeat 함수
-wss.on('connection', (ws, req) => {
-    ws.isAlive = true;
-    ws.on('pong', heartbeat);
-});
-
-// 주기적으로 연결 상태 확인
-const interval = setInterval(() => {
-    wss.clients.forEach((ws) => {
-        if (ws.isAlive === false) return ws.terminate();
-
-        ws.isAlive = false;
-        ws.ping(() => {});
-    });
-}, 30000);
-
-wss.on('close', () => {
-    clearInterval(interval);
-});
 
 // 정적 파일 제공 (예: 프론트엔드 HTML 및 JS 파일)
 app.use(express.static('public'));
