@@ -6,29 +6,14 @@ function renderCalendar(containerId, votesData) {
     calendarContainer.innerHTML = ''; // Clear any existing content
     
     const userId = getToken('clientId');
-    let maxVotes = 0;
-    let mostVotedDay = null;
-    let marks = [];
+
     const key = cookKey(workingYear, workingMonth);
     const today = new Date();
-    // Find the day with the most votes
-    if (calendars[key]) {
-        calendars[key].weeks.forEach(week => {
-            week.forEach(day => {
-                if (day && day.votes.indexOf(userId) > -1) {
-                    marks.push(day.date);
-                }
-                if (day && day.votes.length > maxVotes) {
-                    maxVotes = day.votes.length;
-                    mostVotedDay = day.date;
-                }
-            });
-        });
-    }
-    updateWorkingCalendar(workingYear, workingMonth, votesData);
+  
+    // updateWorkingCalendar 함수에서 결과 객체 반환
+    const { mostVotedDay, maxVotes, clientsSet } = updateWorkingCalendar(workingYear, workingMonth, votesData);
+    updateVoteStatistics(mostVotedDay, maxVotes, clientsSet);
 
-
-    
     const monthData = calendars[key];
     if (!monthData) return;
 
@@ -110,6 +95,62 @@ function renderCalendar(containerId, votesData) {
     calendarContainer.appendChild(daysContainer);
 }
 
+function updateWorkingCalendar(year, month, votesData) {
+    if (!votesData) return;
+    
+    const key = cookKey(year, month);
+    if (!calendars[key]) calendars[key] = createMonthCalendar(year, month);
+    
+    // 지역 변수로 선언하여 함수 내에서만 접근 가능하게 함
+    let maxVotes = 0;
+    let mostVotedDay = null;
+    const clientsSet = new Set(); // 기존의 clients는 전역 Set을 사용하지 않고 함수 내에서 관리
+
+    const calendar = calendars[key];
+    calendar.weeks.forEach(week => {
+        week.forEach(cell => {
+            if (cell) {
+                let dateKey = `${year}-${month}-${cell.date}`;
+                cell.votes = [];
+                
+                if (votesData[dateKey]) {
+                    try {
+                        // votesData[dateKey]가 배열인지 확인 후 처리
+                        if (Array.isArray(votesData[dateKey])) {
+                            votesData[dateKey].forEach(userId => clientsSet.add(userId));
+                            cell.votes = votesData[dateKey];
+                        } else {
+                            console.warn(`votesData[${dateKey}]가 배열이 아닙니다. 자료형: ${typeof votesData[dateKey]}`);
+                            cell.votes = [];
+                        }
+
+                        // 가장 많은 투표를 받은 날짜와 투표 수 업데이트
+                        if (cell.votes.length > maxVotes) {
+                            maxVotes = cell.votes.length;
+                            mostVotedDay = cell.date;
+                        }
+                    } catch (error) {
+                        console.error('Error processing votes for date:', dateKey, error);
+                    }
+                }
+            }        
+        });
+    });
+
+    // 최종적으로 계산된 mostVotedDay와 maxVotes 반환 또는 필요한 곳에 사용
+    // 예를 들어, 반환 값을 renderCalendar 함수에서 사용할 수 있음
+    return { mostVotedDay, maxVotes, clientsSet };
+}
+
+function updateVoteStatistics(mostVotedDay, maxVotes, clientsSet) {
+    if (mostVotedDay === null) {
+        eMostVotedDay.textContent = '선택된 날짜가 없습니다.';
+        voteCount.textContent = '참석자가 없습니다.';
+    } else {
+        eMostVotedDay.textContent = `최대인원 날짜: ${mostVotedDay}일`;
+        voteCount.textContent = `참석 인원: ${clients.size}명 중 ${maxVotes}명`;
+    }
+}
 // Helper function to navigate months
 function navigateMonth(offset) {
     workingMonth += offset;
@@ -200,37 +241,7 @@ function unionSets(setA, setB) {
     return new Set([...setA, ...setB]);
 }
 
-function updateWorkingCalendar(year, month, votesData) {
-    if (!votesData) return;
-    
-    const key = cookKey(year, month);
-    if (!calendars[key]) calendars[key] = createMonthCalendar(year, month);
-    
-    clients.clear();
-    const calendar = calendars[key];
-    calendar.weeks.forEach(week => {
-        week.forEach(cell => {
-            if (cell) {
-                let dateKey = `${year}-${month}-${cell.date}`;
-                cell.votes = [];
-                
-                if (votesData[dateKey]) {
-                    try {
-                        // 클라이언트 Set에 유저 ID 추가
-                        votesData[dateKey].forEach(userId => clients.add(userId));
-                        cell.votes = votesData[dateKey];
-                        if (cell.votes.length > maxVotes) {
-                            mostVotedDay = cell.date;
-                            maxVotes = cell.votes.length;        
-                        }
-                    } catch (error) {
-                        console.error('Error processing votes for date:', dateKey, error);
-                    }
-                }
-            }        
-        });
-    });
-}
+
 
 // 추가: 새로운 사용자가 부서에 추가되었음을 처리하는 함수
 // 이미 public/app.js에서 처리하고 있으므로 이 부분은 생략 가능

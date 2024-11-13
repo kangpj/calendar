@@ -67,7 +67,7 @@ socket.onmessage = (event) => {
 
     if (message.type === 'updateVotes') {
         renderCalendar('calendar', message.data);
-        updateVoteStatistics();
+        //updateVoteStatistics();
     } else if (message.type === 'managerAuthenticated' || message.type === 'userInitialized') {
         // 로그인 성공 시 authModal 숨기기
         document.getElementById('authModal').style.display = 'none';
@@ -106,15 +106,7 @@ function askStatistics() {
     console.log(`#${appSeq++} send a <getStatistics> message`);
 }
 
-function updateVoteStatistics() {
-    if (mostVotedDay === null) {
-        eMostVotedDay.textContent = '선택된 날짜가 없습니다.';
-        voteCount.textContent = '참석자가 없습니다.';
-    } else {
-        eMostVotedDay.textContent = `최대인원 날짜: ${mostVotedDay}일`;
-        voteCount.textContent = `참석 인원: ${clients.size}명 중 ${maxVotes}명`;
-    }
-}
+
 
 // Handle voting on a day
 /*
