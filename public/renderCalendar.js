@@ -196,6 +196,9 @@ function createMonthCalendar(year, month) {
         weeks: calendar
     };
 }
+function unionSets(setA, setB) {
+    return new Set([...setA, ...setB]);
+}
 
 function updateWorkingCalendar(year, month, votesData) {
     if (!votesData) return;
