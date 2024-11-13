@@ -11,9 +11,6 @@ function renderCalendar(containerId, votesData) {
     let marks = [];
     const key = cookKey(workingYear, workingMonth);
     const today = new Date();
-
-    updateWorkingCalendar(workingYear, workingMonth, votesData);
-
     // Find the day with the most votes
     if (calendars[key]) {
         calendars[key].weeks.forEach(week => {
@@ -28,6 +25,9 @@ function renderCalendar(containerId, votesData) {
             });
         });
     }
+    updateWorkingCalendar(workingYear, workingMonth, votesData);
+
+
     
     const monthData = calendars[key];
     if (!monthData) return;

@@ -75,7 +75,7 @@ wss.on('connection', (ws, req) => {
                 // 최초 메시지로 투표 상태 전송
                 ws.send(JSON.stringify({
                     type: 'updateVotes',
-                    data: votesManager.getDefaultDepartment() 
+                    data: votesManager.getAllVotes('default', year, month)
                 }));
 
                 // 기본 부서에 새로운 클라이언트 방송
