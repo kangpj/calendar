@@ -18,9 +18,11 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('부서와 닉네임을 모두 입력해주세요.');
             return;
         }
-
-        if (isUserSignedIn()) {
-            // 부서 또는 닉네임 변경 시 패스키 입력
+        const isSignedIn = isUserSignedIn();
+        const currentDepartment = getStoredDepartment();
+        const currentNickname = getStoredNickname();
+        if (isSignedIn && (department !== currentDepartment || nickname !== currentNickname)) {
+            // 부서 또는 닉네임이 변경된 경우 패스키 입력
             const passkey = prompt('기존 패스키를 입력해주세요:');
             if (!passkey) {
                 alert('패스키를 입력하지 않으면 변경할 수 없습니다.');
@@ -68,8 +70,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (message.type === 'managerAuthenticated' || message.type === 'userInitialized') {
+
+            // 부서와 닉네임을 localStorage에 저장
+            storeDepartment(nicknameInput.value.trim(), departmentInput.value.trim());
+            
             // 로그인 성공 시 패스키를 사용자에게 전달
-            // 이미 app.js에서 처리하므로 이 부분은 생략 가능
+            // 로그인 성공 알림 및 UI 업데이트
+            alert(`성공적으로 로그인되었습니다.\n패스키: ${message.passkey}`);
+            document.getElementById('authModal').style.display = 'none';
+            document.getElementById('key').style.display = 'none';
+            document.getElementById('lock').style.display = 'block';
+            document.getElementById('resetVotesBtn').style.display = 'block';
+            localStorage.setItem('userId', getToken('clientId')); // userId 저장
+            localStorage.setItem('passkey', message.passkey); // 패스키 저장
         }
     });
 
@@ -84,4 +97,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function getToken(tokenName) {
         return localStorage.getItem(tokenName);
     }
+
+    // Helper functions to store and retrieve department and nickname
+    function storeDepartment(nickname, department) {
+        localStorage.setItem('nickname', nickname);
+        localStorage.setItem('department', department);
+    }
+
+    function getStoredDepartment() {
+        return localStorage.getItem('department');
+    }
+
+    function getStoredNickname() {
+        return localStorage.getItem('nickname');
+    }    
 });

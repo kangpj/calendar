@@ -106,21 +106,6 @@ function askStatistics() {
     console.log(`#${appSeq++} send a <getStatistics> message`);
 }
 
-
-
-// Handle voting on a day
-/*
-calendar.addEventListener('click', (e) => {
-    const day = e.target.dataset.day;
-    if (day) {
-        socket.send(JSON.stringify({
-            type: 'vote',
-            data: { year: workingYear, month: workingMonth, day: parseInt(day), userId: getUserId() }
-        }));
-    }
-});
-*/
-
 // Generate a user ID if it doesn’t exist in localStorage
 function getToken(tokenName) {
     if (!localStorage.getItem(tokenName)) {
@@ -199,6 +184,7 @@ document.getElementById('send-chat-btn').addEventListener('click', () => {
 // 'key' div를 클릭했을 때 authModal을 표시��도록 이벤트 리스너 추가
 document.getElementById('key').addEventListener('click', () => {
     document.getElementById('authModal').style.display = 'block';
+    
 });
 
 // 사용자 목록 UI 업데이트 함수 추가

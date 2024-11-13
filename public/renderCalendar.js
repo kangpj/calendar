@@ -83,6 +83,11 @@ function renderCalendar(containerId, votesData) {
                     // Set background color based on votes count
                     const votesCount = day.votes.length || 0;
                     dayCell.style.backgroundColor = `rgba(0, 255, 0, ${Math.min(votesCount / 10, 1)})`;
+
+                    // 현재 사용자가 투표한 날짜인지 확인하여 클래스 추가
+                    if (day.votes.includes(userId)) {
+                        dayCell.classList.add('user-voted-day');
+                    }                    
                 }
 
                 dayCell.appendChild(num);
@@ -148,7 +153,7 @@ function updateVoteStatistics(mostVotedDay, maxVotes, clientsSet) {
         voteCount.textContent = '참석자가 없습니다.';
     } else {
         eMostVotedDay.textContent = `최대인원 날짜: ${mostVotedDay}일`;
-        voteCount.textContent = `참석 인원: ${clients.size}명 중 ${maxVotes}명`;
+        voteCount.textContent = `참석 인원: ${clientsSet.size}명 중 ${maxVotes}명`;
     }
 }
 // Helper function to navigate months
