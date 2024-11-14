@@ -201,17 +201,28 @@ class VotesManager {
         return true;
     }
 
-    // Check if a nickname is taken in a department
+    // Check if a nickname() is taken in a department
     isNicknameTaken(departmentId, nickname) {
-        const department = departments.get(departmentId);
+        const lowerNickname = nickname.toLowerCase();
+        const department = departments.get(departmentId);  
+        if (!this.isAlphabetic(nickname)) {
+            lowerNickname = null;
+        }      
         if (!department) return false;
         for (let userId of department.members) {
             const user = usersData[userId];
-            if (user && user.nickname === nickname) {
+            if (lowerNickname && user && user.nickname.toLowerCase() === lowerNickname) {
+                return true;
+            } else if (!lowerNickname && user && user.nickname === nickname) {
                 return true;
             }
         }
         return false;
+    }
+
+    isAlphabetic(str) {
+        const regex = /^[A-Za-z]+$/;
+        return regex.test(str);
     }
 
     // Check if a department has members
