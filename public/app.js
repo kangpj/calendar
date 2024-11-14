@@ -70,7 +70,6 @@ socket.onmessage = (event) => {
     } else if (message.type === 'updateVotes') {
         const userId = getToken('userId');
         renderCalendar('calendar', message.data, userId);
-        updateVoteStatistics();
     } else if (message.type === 'managerAuthenticated' || message.type === 'userInitialized') {
         // 로그인 성공 시 authModal 숨기기
         document.getElementById('authModal').style.display = 'none';
