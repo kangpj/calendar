@@ -158,7 +158,7 @@ function handleChangeSignIn(ws, clientId, department, nickname, providedPasskey)
 function closeClient(ws, clientId) {  
     if (clientId)  {
         clients.get(clientId).ws.terminate(); // Close the WebSocket connection
-        clients.delete(id); // Remove client from the clients Map
+        clients.delete(clientId); // Remove client from the clients Map
     } else {
         ws.terminate();
     }
