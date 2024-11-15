@@ -66,8 +66,10 @@ socket.onmessage = (event) => {
     const message = JSON.parse(event.data);    
 
     if (message.type === 'setUserId') {
+        const { userId, passKey } = parsedMessage.data;
         console.log(`#${appSeq++} ${message.data}`);
-        localStorage.setItem('userId', message.data[userId]); 
+        localStorage.setItem('userId', userId); 
+        localStorage.setItem('passKey', passKey); 
     } else if (message.type === 'defaultMembers') {
         updateMemberList(message.data);
     } else if (message.type === 'updateVotes') {

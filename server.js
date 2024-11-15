@@ -156,7 +156,7 @@ function handleChangeSignIn(ws, clientId, department, nickname, providedPasskey)
 }
 // Cleanly close a client connection and clear interval
 function closeClient(id) {    
-    clients.get(id).terminate(); // Close the WebSocket connection
+    clients.get(id).ws.terminate(); // Close the WebSocket connection
     clients.delete(id); // Remove client from the clients Map
 
     console.log(`Client ${id} || 'unknown'} disconnected.`);
