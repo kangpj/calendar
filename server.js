@@ -155,11 +155,14 @@ function handleChangeSignIn(ws, clientId, department, nickname, providedPasskey)
     console.log('User changed department/nickname:', usersData[clientId]);
 }
 // Cleanly close a client connection and clear interval
-function closeClient(id) {    
-    clients.get(id).ws.terminate(); // Close the WebSocket connection
-    clients.delete(id); // Remove client from the clients Map
-
-    console.log(`Client ${id || 'unknown'} disconnected.`);
+function closeClient(ws, clientId) {  
+    if (clientId)  {
+        clients.get(clientId).ws.terminate(); // Close the WebSocket connection
+        clients.delete(id); // Remove client from the clients Map
+    } else {
+        ws.terminate();
+    }
+    console.log(`Client ${clientId || 'unknown'} disconnected.`);
     //console.log(`Client ${clients.get(ws)?.id || 'unknown'} disconnected.`);
 }
 // WebSocket 연결 시 메시지 핸들러 설정
@@ -374,7 +377,7 @@ wss.on('connection', (ws, req) => {
         }
     });
 
-    ws.on('close', () => closeClient(currentClientId));
+    ws.on('close', () => closeClient(ws, currentClientId));
 
 
 });
