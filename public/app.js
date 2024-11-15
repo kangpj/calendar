@@ -66,7 +66,7 @@ socket.onmessage = (event) => {
     const message = JSON.parse(event.data);    
 
     if (message.type === 'setUserId') {
-        const { userId, passKey } = message.data;
+        const { userId, department, passKey } = message.data;
         console.log(`#${appSeq++} `, message.data);
         localStorage.setItem('userId', userId); 
         localStorage.setItem('passKey', passKey); 
@@ -75,26 +75,6 @@ socket.onmessage = (event) => {
     } else if (message.type === 'updateVotes') {
         const userId = getToken('userId');
         renderCalendar('calendar', message.data, userId);
-    } else if (message.type === 'signInSuccess') {
-        // 로그인 성공 시 authModal 숨기기
-        console.log(`#${appSeq++} `, message.data);
-        document.getElementById('authModal').style.display = 'none';
-        document.getElementById('key').style.display = 'none';
-        document.getElementById('lock').style.display = 'block';
-        document.getElementById('resetVotesBtn').style.display = 'block';
-        alert(`성공적으로 로그인되었습니다.\n패스키: ${message.passkey}`);
-        localStorage.setItem('passkey', message.passkey); // 패스키 저장
-
-        // 부서 이름으로 채팅 제목 변경
-        const department = getToken('deparment');
-        document.getElementById('chat-section').querySelector('h3')?.remove(); // 기존 제목 제거
-        const chatTitle = document.createElement('h3');
-        chatTitle.textContent = `${department} 부서 채팅`;
-        document.getElementById('chat-section').insertBefore(chatTitle, document.getElementById('chat-container'));
-    } else if (message.type === 'signInFailed') {
-        // 로그인 실패 시 authModal 표시
-        document.getElementById('authModal').style.display = 'block';
-        alert(`로그인 실패: ${message.message}`);
     } else if (message.type === 'newUser') {
         console.log(`New user signed in: ${message.data.nickname} (${message.data.userId}) in department ${message.data.department}`);
         addUserToUI(message.data);
