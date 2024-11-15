@@ -45,10 +45,10 @@ function generateClientSecret(clientId) {
 }
 
 // 부서에 메시지 방송 함수 (clientId 제거)
-function broadcastDepartmentMessage(department, message) {
+function broadcastDepartmentMessage(department, message, clientIdCur = null) {
     const messageString = JSON.stringify(message);
     clients.forEach((clientObj, clientId) => {
-        if (clientObj.department === department && clientObj.ws.readyState === WebSocket.OPEN) {
+        if (clientObj.department === department && clientObj.ws.readyState === WebSocket.OPEN && clientId != clientIdCur) {
             clientObj.ws.send(messageString);
         }
     });
@@ -93,7 +93,7 @@ function handleInitialSignIn(ws, clientId, department, nickname) {
     broadcastDepartmentMessage(department, {
         type: 'newUser',
         data: { userId: newUserId, nickname, department }
-    });
+    ,}, newUserId);
 }
 
 // 부서 변경 시 패스키 인증 및 사용자 데이터 교체 함수 (Case 1.2)
@@ -148,7 +148,7 @@ function handleChangeSignIn(ws, clientId, department, nickname, providedPasskey)
     broadcastDepartmentMessage(department, {
         type: 'newUser',
         data: { userId, nickname, department }
-    });
+    }, userId);
 
     console.log('User changed department/nickname:', usersData[clientId]);
 }
@@ -216,15 +216,15 @@ wss.on('connection', (ws, req) => {
                     data: votesManager.getAllVotes('default', year, month)
                 }));
 
-                // 기본 부서의 모든 클라이언트에게 새로운 클라이언트 접속 방송
+                // 전체 전달
                 broadcastDepartmentMessage('default', {
-                    type: 'newClient',
+                    type: 'newUser',
                     data: { 
                         userId: usersData[currentClientId].userId, 
                         department: 'default',
                         nickname: usersData[currentClientId].nickname || '익명'
                     }
-                });
+                }, currentUserId);
 
 
             // signIn message can bump into four cases
@@ -268,7 +268,7 @@ wss.on('connection', (ws, req) => {
                         } else {
                             // **Case 2.2.2:** User datas are different each other
                             ws.send(JSON.stringify({ type: 'signInFailure', message: '부서 또는 닉네임이 변경되었습니다. 패스키를 입력해주세요.' }));
-                        }
+                        }                         
                     }
                 }
 

@@ -92,7 +92,7 @@ socket.onmessage = (event) => {
         document.getElementById('authModal').style.display = 'block';
         alert(`로그인 실패: ${message.message}`);
     } else if (message.type === 'newClient') {
-        console.log(`New anonymous user connected: ${message.data.userId}`);
+        console.log(`New user connected: ${message.data.userId}`);
         addUserToUI(message.data);
     } else if (message.type === 'newUser') {
         console.log(`New user signed in: ${message.data.nickname} (${message.data.userId}) in department ${message.data.department}`);
