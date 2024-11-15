@@ -374,7 +374,7 @@ wss.on('connection', (ws, req) => {
         }
     });
 
-    ws.on('close', () => closeClient(ws, currentClientIP, currentClientId, currentDepartment));
+    ws.on('close', () => closeClient(currentClientId));
 
 
 });
