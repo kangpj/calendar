@@ -78,7 +78,7 @@ function handleInitialSignIn(ws, clientId, department, nickname) {
         passkey 
     };
     console.log(`User registered: ${newUserId} in department ${department}`);
-    ws.send(JSON.stringify({ type: 'setUserId', data: newUserId }));
+    ws.send(JSON.stringify({ type: 'setUserId', data: usersData[clientId] }));
     // 부서에 사용자 추가
     votesManager.addUserToDepartment(department, newUserId);
 
@@ -86,9 +86,9 @@ function handleInitialSignIn(ws, clientId, department, nickname) {
     if (votesManager.isFirstUserInDepartment(department)) {
         usersData[clientId].isManager = true;
         votesManager.assignDepartmentManager(department, newUserId);
-        ws.send(JSON.stringify({ type: 'signinSuccess', message: '성공적으로 로그인되었습니다.', passkey }));
+        ws.send(JSON.stringify({ type: 'signInSuccess', message: '성공적으로 로그인되었습니다.', department }));
     } else {
-        ws.send(JSON.stringify({ type: 'signinSuccess', message: '성공적으로 로그인되었습니다.', passkey }));
+        ws.send(JSON.stringify({ type: 'signInSuccess', message: '성공적으로 로그인되었습니다.', department }));
     }
 
     // 부서에 새로운 사용자 방송
@@ -141,9 +141,9 @@ function handleChangeSignIn(ws, clientId, department, nickname, providedPasskey)
     if (votesManager.isFirstUserInDepartment(department)) {
         user.isManager = true;
         votesManager.assignDepartmentManager(department, userId);
-        ws.send(JSON.stringify({ type: 'signinSuccess', message: '패스키 인증 후 성공적으로 로그인되었습니다.', passkey: user.passkey }));
+        ws.send(JSON.stringify({ type: 'signInSuccess', message: '패스키 인증 후 성공적으로 로그인되었습니다.', passkey: user.passkey }));
     } else {
-        ws.send(JSON.stringify({ type: 'signinSuccess', message: '패스키 인증 후 성공적으로 로그인되었습니다.', passkey: user.passkey }));
+        ws.send(JSON.stringify({ type: 'signInSuccess', message: '패스키 인증 후 성공적으로 로그인되었습니다.', passkey: user.passkey }));
     }
 
     // 새로운 부서에 사용자 방송
@@ -192,10 +192,7 @@ wss.on('connection', (ws, req) => {
                     // Respond currentUserId to the client so that he can write down it on its localStorage
                     // The userId is needed to figure out which data is its own.
                     // Because every json votesData regarding a client is identified by its userId.
-                    ws.send(JSON.stringify({
-                        type: 'setUserId',
-                        data: newUserId
-                    }));
+                    ws.send(JSON.stringify({ type: 'setUserId', data: usersData[clientId] }));
 
                 }
                 // Step 3. Now that usersData was set, we can access usersData
@@ -272,10 +269,10 @@ wss.on('connection', (ws, req) => {
                         // **Case 2.2:** There is user data with regard to current client
                         if (user.department === newDepartment && user.nickname === newNickname) {
                             // **Case 2.2.1:** User datas are the same each other
-                            ws.send(JSON.stringify({ type: 'signinSuccess', message: '성공적으로 로그인되었습니다.' }));
+                            ws.send(JSON.stringify({ type: 'signInSuccess', message: '성공적으로 로그인되었습니다.' }));
                         } else {
                             // **Case 2.2.2:** User datas are different each other
-                            ws.send(JSON.stringify({ type: 'signInFailure', message: '부서 또는 닉네임이 변경되었습니다. 패스키를 입력해주세요.' }));
+                            ws.send(JSON.stringify({ type: 'signInFailed', message: '이미 등록된 부서-별칭 입니다.' }));
                         }                         
                     }
                 }
@@ -331,18 +328,7 @@ wss.on('connection', (ws, req) => {
                         data: votesData
                     });
                 }
-            } else if (parsedMessage.type === 'getStatistics') {
-                const { year, month } = parsedMessage.data;
-                const { theDay, theNumber } = votesManager.getMostVotedDayInMonth(year, month);
-                // 유니캐스트: 특정 클라이언트에게만 전송
-                ws.send(JSON.stringify({
-                    type: 'updateVoteStatistic',
-                    data: {
-                        votersTotal: votesManager.getUniqueVoters(),
-                        availableTotal: theNumber, 
-                        theDay: theDay
-                    }
-                }));
+
             } else if (parsedMessage.type === 'resetVotes' && usersData[currentClientId]?.isManager) {
                 votesManager.clearAllVotes(currentDepartment);
                 broadcastDepartmentMessage(currentDepartment, {

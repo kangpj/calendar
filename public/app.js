@@ -14,7 +14,7 @@ const caption       = document.getElementById('caption');
 
 
 const calendars     = {};
-const users         = new Set();
+//const users         = new Set();
 const clients       = new Set();
 const currentYear   = new Date().getFullYear();
 const currentMonth  = new Date().getMonth() + 1;
@@ -66,13 +66,14 @@ socket.onmessage = (event) => {
     const message = JSON.parse(event.data);    
 
     if (message.type === 'setUserId') {
-        localStorage.setItem('userId', message.data); 
+        console.log(`#${appSeq++} ${message.data}`);
+        localStorage.setItem('userId', message.data[userId]); 
     } else if (message.type === 'defaultMembers') {
         updateMemberList(message.data);
     } else if (message.type === 'updateVotes') {
         const userId = getToken('userId');
         renderCalendar('calendar', message.data, userId);
-    } else if (message.type === 'managerAuthenticated' || message.type === 'userInitialized' || message.type === 'signinSuccess') {
+    } else if (message.type === 'signInSuccess') {
         // 로그인 성공 시 authModal 숨기기
         document.getElementById('authModal').style.display = 'none';
         document.getElementById('key').style.display = 'none';
@@ -82,7 +83,7 @@ socket.onmessage = (event) => {
         localStorage.setItem('passkey', message.passkey); // 패스키 저장
 
         // 부서 이름으로 채팅 제목 변경
-        const department = usersData[getToken('clientId')].department;
+        const department = getToken('deparment');
         document.getElementById('chat-section').querySelector('h3')?.remove(); // 기존 제목 제거
         const chatTitle = document.createElement('h3');
         chatTitle.textContent = `${department} 부서 채팅`;
@@ -119,19 +120,10 @@ function updateMemberList(members) {
     });
 }
 
-// Request statistics from server
-function askStatistics() {
-    socket.send(JSON.stringify({
-        type: 'getStatistics',
-        data: { year: workingYear, month: workingMonth }
-    }));
-    console.log(`#${appSeq++} send a <getStatistics> message`);
-}
-
-// Generate a user ID if it doesn’t exist in localStorage
+// Generate any token if it doesn’t exist in localStorage
 function getToken(tokenName) {
     if (!localStorage.getItem(tokenName)) {
-        localStorage.setItem(tokenName, 'client_' + Math.random().toString(36).substr(2, 9));
+        localStorage.setItem(tokenName, `${tokenName}_` + Math.random().toString(36).substr(2, 9));
     }
     return localStorage.getItem(tokenName);
 }

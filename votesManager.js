@@ -205,24 +205,15 @@ class VotesManager {
     isNicknameTaken(departmentId, nickname) {
         const lowerNickname = nickname.toLowerCase();
         const department = departments.get(departmentId);  
-        if (!this.isAlphabetic(nickname)) {
-            lowerNickname = null;
-        }      
+ 
         if (!department) return false;
         for (let userId of department.members) {
             const user = usersData[userId];
-            if (lowerNickname && user && user.nickname.toLowerCase() === lowerNickname) {
-                return true;
-            } else if (!lowerNickname && user && user.nickname === nickname) {
+            if (user && user.nickname.toLowerCase() === lowerNickname) {
                 return true;
             }
         }
         return false;
-    }
-
-    isAlphabetic(str) {
-        const regex = /^[A-Za-z]+$/;
-        return regex.test(str);
     }
 
     // Check if a department has members
