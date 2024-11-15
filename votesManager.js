@@ -24,24 +24,7 @@ class VotesManager {
         }
         return departments.get(departmentId).votesData;
     }
-    /**
-     * 특정 부서의 현재 멤버 목록을 반환
-     * @param {string} department - 조회할 부서 이름
-     * @returns {Array} - 부서에 속한 사용자 ID 목록
-     */
-    getMembersByDepartment(department) {
-        const members = [];
-        for (let [clientId, userData] of usersData.entries()) {
-            if (userData.department === department && !userData.isAnonymous) {
-                members.push({
-                    userId: userData.userId,
-                    nickname: userData.nickname,
-                    department: userData.department
-                });
-            }
-        }
-        return members;
-    }
+
     // Assign the first member as the owner of the department
     assignOwner(departmentId, userId) {
         const department = departments.get(departmentId);

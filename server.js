@@ -202,7 +202,7 @@ wss.on('connection', (ws, req) => {
                 });
 
                 // 기본 부서의 현재 멤버 목록 조회
-                const defaultMembers = votesManager.getMembersByDepartment('default');
+                const defaultMembers = votesManager.getDepartmentMembers('default');
 
                 // 클라이언트에게 기본 부서 멤버 목록 전송
                 ws.send(JSON.stringify({
