@@ -77,6 +77,7 @@ socket.onmessage = (event) => {
         renderCalendar('calendar', message.data, userId);
     } else if (message.type === 'signInSuccess') {
         // 로그인 성공 시 authModal 숨기기
+        console.log(`#${appSeq++} `, message.data);
         document.getElementById('authModal').style.display = 'none';
         document.getElementById('key').style.display = 'none';
         document.getElementById('lock').style.display = 'block';

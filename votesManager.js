@@ -212,6 +212,7 @@ class VotesManager {
             if (user && user.nickname.toLowerCase() === lowerNickname) {
                 return true;
             }
+            console.log(`#isNicknameTaken# A:${user.nickname.toLowerCase()} B:${lowerNickname}`);
         }
         return false;
     }

@@ -61,7 +61,7 @@ function handleInitialSignIn(ws, clientId, department, nickname) {
         ws.send(JSON.stringify({ type: 'signInFailed', message: '이미 사용 중인 부서-닉네임 조합입니다.' }));
         return;
     } else {
-        console.log(`clientId: ${clientId}, department: ${department}, nickname: ${nickname}`);
+        console.log(`#${department} members: `, votesManager.getDepartmentMembers());
     }
 
     // 새로운 userId 및 패스키 생성
