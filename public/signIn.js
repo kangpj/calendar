@@ -18,9 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
         nicknameInput.value = storedNickname;
     }
 
-    // Show the authentication modal only when 'key' is clicked
-    // 초기 로그인 시 모달을 자동으로 표시하지 않음
-
     // Event listener for the Sign-In button
     signInBtn.addEventListener('click', () => {
         const department = departmentInput.value.trim();
@@ -35,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const currentNickname = getStoredNickname();
         if (isSignedIn && (department !== currentDepartment || nickname !== currentNickname)) {
             // 부서 또는 닉네임이 변경된 경우 패스키 입력
-            const passkey = prompt('기존 패스키를 입력해주세요:');
+            const passkey = prompt('부서/닉네임 변경\n기존 패스키를 입력해주세요:');
             if (!passkey) {
                 alert('패스키를 입력하지 않으면 변경할 수 없습니다.');
                 return;
@@ -58,7 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const signInData = {
                 type: 'signIn',
                 data: {
-                    
                     department: department,
                     nickname: nickname
                     // passkey는 서버에서 생성되므로 클라이언트는 전송하지 않음
@@ -80,19 +76,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (message.type === 'signInFailed') {
             alert(`로그인 실패: ${message.message}`);
             signInBtn.disabled = false;
+            authModal.style.display = 'block'; // Show the modal again on failure
         }
 
         if (message.type === 'managerAuthenticated' || message.type === 'userInitialized') {
-
             // 부서와 닉네임을 localStorage에 저장
             storeDepartment(nicknameInput.value.trim(), departmentInput.value.trim());
 
             // 로그인 성공 시 패스키를 사용자에게 전달
-            // 로그인 성공 알림 및 UI 업데이트
             alert(`성공적으로 로그인되었습니다.\n패스키: ${message.passkey}`);
-            document.getElementById('authModal').style.display = 'none';
-            document.getElementById('key').style.display = 'none';
-            document.getElementById('lock').style.display = 'block';
+            authModal.style.display = 'none';
+            keyIcon.style.display = 'none';
+            lockIcon.style.display = 'block';
             document.getElementById('resetVotesBtn').style.display = 'block';
             localStorage.setItem('userId', getToken('clientId')); // userId 저장
             localStorage.setItem('passkey', message.passkey); // 패스키 저장
@@ -102,7 +97,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Function to check if the user is already signed in
     function isUserSignedIn() {
         const userId = getToken('userId');
-        // Implement additional checks if necessary (e.g., check if user data exists)
         return userId !== null;
     }
 

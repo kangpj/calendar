@@ -67,6 +67,8 @@ socket.onmessage = (event) => {
 
     if (message.type === 'setUserId') {
         localStorage.setItem('userId', message.data); 
+    } else if (message.type === 'defaultMembers') {
+        updateMemberList(message.data);
     } else if (message.type === 'updateVotes') {
         const userId = getToken('userId');
         renderCalendar('calendar', message.data, userId);
@@ -77,7 +79,6 @@ socket.onmessage = (event) => {
         document.getElementById('lock').style.display = 'block';
         document.getElementById('resetVotesBtn').style.display = 'block';
         alert(`성공적으로 로그인되었습니다.\n패스키: ${message.passkey}`);
-        //localStorage.setItem('userId', getToken('userId')); // userId 저장
         localStorage.setItem('passkey', message.passkey); // 패스키 저장
 
         // 부서 이름으로 채팅 제목 변경
@@ -87,30 +88,39 @@ socket.onmessage = (event) => {
         chatTitle.textContent = `${department} 부서 채팅`;
         document.getElementById('chat-section').insertBefore(chatTitle, document.getElementById('chat-container'));
     } else if (message.type === 'signInFailed') {
-        // 로그인 실패 시 처리
-        console.log('Sign in failed:', message.message);
+        // 로그인 실패 시 authModal 표시
+        document.getElementById('authModal').style.display = 'block';
+        alert(`로그인 실패: ${message.message}`);
     } else if (message.type === 'newClient') {
-        // default 부서의 새로운 클라이언트 접속 처리
         console.log(`New anonymous user connected: ${message.data.userId}`);
-        // 필요에 따라 UI 업데이트
+        addUserToUI(message.data);
     } else if (message.type === 'newUser') {
-        // 동일 부서의 새로운 사용자 접속 처리
         console.log(`New user signed in: ${message.data.nickname} (${message.data.userId}) in department ${message.data.department}`);
         addUserToUI(message.data);
-        // 채팅 제목 업데이트 (동일 부서의 새 사용자가 있을 때 재설정)
         const department = message.data.department;
         document.getElementById('chat-section').querySelector('h3')?.remove(); // 기존 제목 제거
         const chatTitle = document.createElement('h3');
         chatTitle.textContent = `${department} 부서 채팅`;
         document.getElementById('chat-section').insertBefore(chatTitle, document.getElementById('chat-container'));
     } else if (message.type === 'userLoggedOut') {
-        // 부서 내 사용자가 로그아웃했을 때 처리
         console.log(`User logged out: ${message.data.userId} from department ${message.data.department}`);
         removeUserFromUI(message.data.userId);
     } else if (message.type === 'pong') {
         console.log(`#${appSeq++} Received pong from server`);
     }
 };
+
+// Update the member list UI
+function updateMemberList(members) {
+    const userList = document.getElementById('userList');
+    userList.innerHTML = ''; // Clear existing list
+    members.forEach(member => {
+        const userItem = document.createElement('li');
+        userItem.id = `${member.userId}`;
+        userItem.textContent = `${member.nickname}`;
+        userList.appendChild(userItem);
+    });
+}
 
 // Request statistics from server
 function askStatistics() {

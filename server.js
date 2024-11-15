@@ -76,7 +76,7 @@ function handleInitialSignIn(ws, clientId, department, nickname) {
         passkey 
     };
     console.log(`User registered: ${newUserId} in department ${department}`);
-
+    ws.send(JSON.stringify({ type: 'setUserId', data: newUserId }));
     // 부서에 사용자 추가
     votesManager.addUserToDepartment(department, newUserId);
 
@@ -201,16 +201,29 @@ wss.on('connection', (ws, req) => {
                     department:     'default' // 부서 필드 추가
                 });
 
+                // 기본 부서의 현재 멤버 목록 조회
+                const defaultMembers = votesManager.getMembersByDepartment('default');
+
+                // 클라이언트에게 기본 부서 멤버 목록 전송
+                ws.send(JSON.stringify({
+                    type: 'defaultMembers',
+                    data: defaultMembers
+                }));
+
                 // 최초 메시지로 투표 상태 전송
                 ws.send(JSON.stringify({
                     type: 'updateVotes',
                     data: votesManager.getAllVotes('default', year, month)
                 }));
 
-                // default 부서의 모든 클라이언트에게 새로운 클라이언트 접속 방송
+                // 기본 부서의 모든 클라이언트에게 새로운 클라이언트 접속 방송
                 broadcastDepartmentMessage('default', {
                     type: 'newClient',
-                    data: { userId: usersData[currentClientId].userId, department: 'default' }
+                    data: { 
+                        userId: usersData[currentClientId].userId, 
+                        department: 'default',
+                        nickname: usersData[currentClientId].nickname || '익명'
+                    }
                 });
 
 
