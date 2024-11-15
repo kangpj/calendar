@@ -60,6 +60,8 @@ function handleInitialSignIn(ws, clientId, department, nickname) {
     if (votesManager.isNicknameTaken(department, nickname)) {
         ws.send(JSON.stringify({ type: 'signInFailed', message: '이미 사용 중인 부서-닉네임 조합입니다.' }));
         return;
+    } else {
+        console.log(`clientId: ${clientId}, department: ${department}, nickname: ${nickname}`);
     }
 
     // 새로운 userId 및 패스키 생성
@@ -93,7 +95,7 @@ function handleInitialSignIn(ws, clientId, department, nickname) {
     broadcastDepartmentMessage(department, {
         type: 'newUser',
         data: { userId: newUserId, nickname, department }
-    ,}, newUserId);
+    ,});
 }
 
 // 부서 변경 시 패스키 인증 및 사용자 데이터 교체 함수 (Case 1.2)

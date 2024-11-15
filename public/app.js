@@ -72,7 +72,7 @@ socket.onmessage = (event) => {
     } else if (message.type === 'updateVotes') {
         const userId = getToken('userId');
         renderCalendar('calendar', message.data, userId);
-    } else if (message.type === 'managerAuthenticated' || message.type === 'userInitialized') {
+    } else if (message.type === 'managerAuthenticated' || message.type === 'userInitialized' || message.type === 'signinSuccess') {
         // 로그인 성공 시 authModal 숨기기
         document.getElementById('authModal').style.display = 'none';
         document.getElementById('key').style.display = 'none';
@@ -91,9 +91,6 @@ socket.onmessage = (event) => {
         // 로그인 실패 시 authModal 표시
         document.getElementById('authModal').style.display = 'block';
         alert(`로그인 실패: ${message.message}`);
-    } else if (message.type === 'newClient') {
-        console.log(`New user connected: ${message.data.userId}`);
-        addUserToUI(message.data);
     } else if (message.type === 'newUser') {
         console.log(`New user signed in: ${message.data.nickname} (${message.data.userId}) in department ${message.data.department}`);
         addUserToUI(message.data);
