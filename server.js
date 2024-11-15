@@ -159,7 +159,8 @@ function closeClient(id) {
     clients.get(id).ws.terminate(); // Close the WebSocket connection
     clients.delete(id); // Remove client from the clients Map
 
-    console.log(`Client ${id} || 'unknown'} disconnected.`);
+    console.log(`Client ${id || 'unknown'} disconnected.`);
+    //console.log(`Client ${clients.get(ws)?.id || 'unknown'} disconnected.`);
 }
 // WebSocket 연결 시 메시지 핸들러 설정
 wss.on('connection', (ws, req) => {
