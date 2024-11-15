@@ -209,11 +209,14 @@ class VotesManager {
         return true;
     }
 
-    // Check if a nickname() is taken in a department
+    // Check if a nickname is taken in a department
     isNicknameTaken(departmentId, nickname) {
         const lowerNickname = nickname.toLowerCase();
         const department = this.departments.get(departmentId);
-        if (!department) return false;
+        if (!department) {
+            console.error(`Department ${departmentId} does not exist.`);
+            return false;
+        }
         for (let userId of department.members) {
             const user = usersData[userId];
             if (user && user.nickname.toLowerCase() === lowerNickname) {
