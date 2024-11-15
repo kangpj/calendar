@@ -154,7 +154,13 @@ function handleChangeSignIn(ws, clientId, department, nickname, providedPasskey)
 
     console.log('User changed department/nickname:', usersData[clientId]);
 }
+// Cleanly close a client connection and clear interval
+function closeClient(id) {    
+    clients.get(id).terminate(); // Close the WebSocket connection
+    clients.delete(id); // Remove client from the clients Map
 
+    console.log(`Client ${id} || 'unknown'} disconnected.`);
+}
 // WebSocket 연결 시 메시지 핸들러 설정
 wss.on('connection', (ws, req) => {
 
