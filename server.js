@@ -192,7 +192,7 @@ wss.on('connection', (ws, req) => {
                     // Respond currentUserId to the client so that he can write down it on its localStorage
                     // The userId is needed to figure out which data is its own.
                     // Because every json votesData regarding a client is identified by its userId.
-                    ws.send(JSON.stringify({ type: 'setUserId', data: usersData[clientId] }));
+                    ws.send(JSON.stringify({ type: 'setUserId', data: usersData[currentClientId] }));
 
                 }
                 // Step 3. Now that usersData was set, we can access usersData
