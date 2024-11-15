@@ -44,6 +44,7 @@ class VotesManager {
         this.getDepartmentVotes(departmentId); // Ensure department exists
         const department = departments.get(departmentId);
         department.members.add(userId);
+        console.log(`#addUserToDepartment: User ${userId} has added in department ${departmentId}.`);
     }
 
     // Remove a user from a department
@@ -210,8 +211,6 @@ class VotesManager {
         for (let userId of department.members) {
             const user = usersData[userId];
             if (user && user.nickname.toLowerCase() === lowerNickname) {
-                
-                console.log(`#isNicknameTaken# A:${user.nickname.toLowerCase()} B:${lowerNickname}`);
                 return true;
             }
         }   

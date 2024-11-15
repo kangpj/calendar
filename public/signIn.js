@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
             //localStorage.setItem('userId', getToken('clientId')); // userId 저장
             //localStorage.setItem('passkey', message.passkey); // 패스키 저장
             // 부서 이름으로 채팅 제목 변경
-            const department = getToken('deparment');
+            const department = getToken('department');
             document.getElementById('chat-section').querySelector('h3')?.remove(); // 기존 제목 제거
             const chatTitle = document.createElement('h3');
             chatTitle.textContent = `${department} 부서 채팅`;
