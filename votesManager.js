@@ -52,7 +52,7 @@ class VotesManager {
         this.initializeDepartment(departmentId);
         const department = this.departments.get(departmentId);
         department.members.add(userId);
-        console.log(`User ${userId} added to department ${departmentId}.`);
+        console.log(`User ${userId} added to department ${departmentId}.`, this.departments);
     }
 
     // Remove a user from a department

@@ -165,6 +165,63 @@ function closeClient(ws, clientId) {
     console.log(`Client ${clientId || 'unknown'} disconnected.`);
     //console.log(`Client ${clients.get(ws)?.id || 'unknown'} disconnected.`);
 }
+
+// Function to handle sign-in and update user department
+function handleSignIn(ws, clientId, department, nickname, passkey = null) {
+    const user = usersData[clientId];
+
+    if (!user) {
+        // Case 1.1: New user registration
+        handleInitialSignIn(ws, clientId, department, nickname);
+    } else if (user.isAnonymous) {
+        // Case 1.2: Anonymous user with existing data
+        if (passkey && user.passkey === passkey) {
+            updateUserDepartment(clientId, department, nickname);
+            ws.send(JSON.stringify({ type: 'signInSuccess', message: 'Successfully signed in.', department }));
+        } else {
+            ws.send(JSON.stringify({ type: 'signInFailed', message: 'Passkey authentication failed.' }));
+        }
+    } else {
+        // Case 2: Known department-nickname pair
+        if (user.department === department && user.nickname === nickname) {
+            ws.send(JSON.stringify({ type: 'signInSuccess', message: 'Successfully signed in.', department }));
+        } else {
+            // Allow department and nickname change with passkey verification
+            if (passkey && user.passkey === passkey) {
+                updateUserDepartment(clientId, department, nickname);
+                ws.send(JSON.stringify({ type: 'signInSuccess', message: 'Department and nickname updated successfully.', department }));
+            } else {
+                ws.send(JSON.stringify({ type: 'signInFailed', message: 'Passkey authentication failed or department-nickname pair already registered.' }));
+            }
+        }
+    }
+}
+
+// Function to update user department and nickname
+function updateUserDepartment(clientId, department, nickname) {
+    const user = usersData[clientId];
+    if (user) {
+        // Remove user from old department
+        const oldDepartment = user.department;
+        votesManager.removeUserFromDepartment(oldDepartment, user.userId);
+
+        // Update user data
+        user.department = department;
+        user.nickname = nickname;
+
+        // Add user to new department
+        votesManager.addUserToDepartment(department, user.userId);
+
+        // Update client's department in the clients map
+        const clientObj = clients.get(clientId);
+        if (clientObj) {
+            clientObj.department = department;
+        }
+
+        console.log(`User ${user.userId} updated to department ${department}.`);
+    }
+}
+
 // WebSocket 연결 시 메시지 핸들러 설정
 wss.on('connection', (ws, req) => {
 
@@ -188,7 +245,7 @@ wss.on('connection', (ws, req) => {
                     const newUserId = generateUserId();
                     usersData[currentClientId] = { 
                         userId: newUserId, 
-                        isAnonymous: true,
+                        isAnonymous: true, // Set to true on init
                         passkey: null // 패스키 초기화
                     };
                     console.log(`Assigned new anonymous userId: ${newUserId} to clientId: ${currentClientId}`);
@@ -197,7 +254,9 @@ wss.on('connection', (ws, req) => {
                     // The userId is needed to figure out which data is its own.
                     // Because every json votesData regarding a client is identified by its userId.
                     ws.send(JSON.stringify({ type: 'setUserId', data: usersData[currentClientId] }));
-
+                } else {
+                    // If user data exists, ensure isAnonymous is set to true
+                    usersData[currentClientId].isAnonymous = true;
                 }
                 // Step 3. Now that usersData was set, we can access usersData
                 currentUserId = usersData[currentClientId].userId;
@@ -234,8 +293,7 @@ wss.on('connection', (ws, req) => {
                         nickname: usersData[currentClientId].nickname || '익명'
                     }
                 }, currentUserId);
-
-
+            
             // signIn message can bump into four cases
             // Case 1. Sign In with unknown department/nickname from a client pc 
             //  Case 1-1. There isn't user data with regard to current client: Register user department, nickname and passkey
@@ -246,41 +304,8 @@ wss.on('connection', (ws, req) => {
             //      Case 2-2-1. User datas are the same each other: signIn success
             //      Case 2-2-1. User datas are different each other: signIn failure                  
             } else if (parsedMessage.type === 'signIn') {
-                const { department, nickname } = parsedMessage.data;
-
-                const user = usersData[currentClientId];
-
-                if (!user.passkey) {
-                    // **Case 1.1, (2.1):** There isn't user data with regard to current client
-                    handleInitialSignIn(ws, currentClientId, department, nickname);
-                } else {
-                    if (user.isAnonymous) {
-                        // **Case 1.2:** There is user data and user is anonymous
-                        const providedPasskey = parsedMessage.data.passkey;
-                        if (providedPasskey) {
-                            handleChangeSignIn(ws, currentClientId, department, nickname, providedPasskey);
-                        } else {
-                            // 사용자가 패스키를 제공하지 않은 경우 추가 요청
-                            ws.send(JSON.stringify({ type: 'authenticatePasskey', message: '패스키를 입력해주세요.' }));
-                        }
-                    } else {
-                        // **Case 2:** Sign In with known department-nickname pair
-                        const { department: newDepartment, nickname: newNickname } = parsedMessage.data;
-                        
-                        // **Case 2.1:** There isn't user data with regard to current client
-                        // (이미 `user` 데이터가 존재하므로 이 케이스는 해당되지 않음)
-                        
-                        // **Case 2.2:** There is user data with regard to current client
-                        if (user.department === newDepartment && user.nickname === newNickname) {
-                            // **Case 2.2.1:** User datas are the same each other
-                            ws.send(JSON.stringify({ type: 'signInSuccess', message: '성공적으로 로그인되었습니다.' }));
-                        } else {
-                            // **Case 2.2.2:** User datas are different each other
-                            ws.send(JSON.stringify({ type: 'signInFailed', message: '이미 등록된 부서-별칭 입니다.' }));
-                        }                         
-                    }
-                }
-
+                const { department, nickname, passkey } = parsedMessage.data;
+                handleSignIn(ws, currentClientId, department, nickname, passkey);
             } else if (parsedMessage.type === 'logout') {
                 if (currentUserId) {
                     console.log(`#${logSeq++} Debug:(logout) clientId>${currentClientId} userId>${currentUserId}`);
@@ -310,29 +335,13 @@ wss.on('connection', (ws, req) => {
                 }));
             } else if (parsedMessage.type === 'vote') {
                 const { year, month, day, userId } = parsedMessage.data;
-                console.log(`#${logSeq++} Debug:(vote) clientId>${currentClientId} userId>${userId}`);
-
-                // 특정 부서에 투표 등록
-                votesManager.toggleVote(currentDepartment, year, month, day, userId);
-                
-                // 특정 연도와 월에 필터링된 투표 데이터 가져오기
-                const votesData = votesManager.getAllVotes(currentDepartment, year, month);
-
-                // 업데이트된 투표 데이터 방송
-                if (day === 0) {
-                    // 유니캐스트: 특정 클라이언트에게만 전송
-                    ws.send(JSON.stringify({
-                        type: 'updateVotes',
-                        data: votesData
-                    }));
-                } else {
-                    // 브로드캐스트: 동일 부서의 모든 클라이언트에게 전송
-                    broadcastDepartmentMessage(currentDepartment, {
-                        type: 'updateVotes',
-                        data: votesData
-                    });
+                const user = usersData[currentClientId];
+                if (user) {
+                    const userDepartment = user.department;
+                    votesManager.toggleVote(userDepartment, year, month, day, userId);
+                    const votesData = votesManager.getAllVotes(userDepartment, year, month);
+                    ws.send(JSON.stringify({ type: 'updateVotes', data: votesData }));
                 }
-
             } else if (parsedMessage.type === 'resetVotes' && usersData[currentClientId]?.isManager) {
                 votesManager.clearAllVotes(currentDepartment);
                 broadcastDepartmentMessage(currentDepartment, {
