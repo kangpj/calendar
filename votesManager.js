@@ -206,7 +206,7 @@ class VotesManager {
     isNicknameTaken(departmentId, nickname) {
         const lowerNickname = nickname.toLowerCase();
         const department = departments.get(departmentId);  
-        console.log(`All members in department ${departmentId}: `, departments.get(members));
+        console.log(`All members in department ${departmentId}: `, department.members);
         if (!department) return false;
         for (let userId of department.members) {
             const user = usersData[userId];
