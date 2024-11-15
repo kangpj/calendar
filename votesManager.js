@@ -210,10 +210,11 @@ class VotesManager {
         for (let userId of department.members) {
             const user = usersData[userId];
             if (user && user.nickname.toLowerCase() === lowerNickname) {
+                
+                console.log(`#isNicknameTaken# A:${user.nickname.toLowerCase()} B:${lowerNickname}`);
                 return true;
             }
-            console.log(`#isNicknameTaken# A:${user.nickname.toLowerCase()} B:${lowerNickname}`);
-        }
+        }   
         return false;
     }
 
