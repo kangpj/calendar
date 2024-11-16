@@ -109,8 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to check if the user is already signed in
     function isUserSignedIn() {
-        const userId = getToken('userId');
-        return userId !== null;
+        return getToken('nickname') !== null;
     }
 
     // Helper function to retrieve tokens from localStorage
