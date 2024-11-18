@@ -195,16 +195,21 @@ function updateUserDepartment(clientId, department, nickname, passkey) {
 }
 
 
-// Cleanly close a client connection and clear interval
-function closeClient(ws, clientId) {  
-    if (clientId)  {
-        clients.get(clientId).ws.terminate(); // Close the WebSocket connection
-        clients.delete(clientId); // Remove client from the clients Map
+// Function to cleanly close a client connection
+function closeClient(ws, clientId) {
+    if (clientId && clients.has(clientId)) {
+        const clientObj = clients.get(clientId);
+        if (clientObj && clientObj.ws === ws) {
+            // Close the WebSocket connection
+            clientObj.ws.terminate();
+            // Remove client from the clients Map
+            clients.delete(clientId);
+            console.log(`Client ${clientId} disconnected.`);
+        }
     } else {
         ws.terminate();
+        console.log(`Unknown client disconnected.`);
     }
-    console.log(`Client ${clientId || 'unknown'} disconnected.`);
-    //console.log(`Client ${clients.get(ws)?.id || 'unknown'} disconnected.`);
 }
 
 // Function to handle sign-in and update user department
@@ -215,8 +220,7 @@ function handleSignIn(ws, clientId, department, nickname, passkey = null) {
         handleInitialSignIn(ws, clientId, department, nickname);
     } else {
         if (user.department === department && user.nickname === nickname && user.passkey === passkey) {
-            // Case 2-2-1
-            ws.send(JSON.stringify({ type: 'signInSuccess', message: 'Successfully signed in.', department, passkey }));
+            ws.send(JSON.stringify({ type: 'signInSuccess', message: 'Successfully signed in.', department, passkey: user.passkey }));
         } else {
             // Case 1-2
             handleChangeSignIn(ws, clientId, department,nickname, passkey);
