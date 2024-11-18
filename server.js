@@ -54,6 +54,28 @@ function broadcastDepartmentMessage(department, message, clientIdCur = null) {
     });
 }
 
+// 사용자 목록을 특정 클라이언트에게 전송하는 함수
+function sendUserList(ws, clientId) {
+    const currentUser = usersData[clientId];
+    if (!currentUser) {
+        ws.send(JSON.stringify({ type: 'error', message: '사용자 데이터가 없습니다.' }));
+        return;
+    }
+
+    const targetDepartments = [currentUser.department]; // Only the client's own department
+    const userList = Object.entries(usersData)
+        .filter(([id, user]) => targetDepartments.includes(user.department))
+        .map(([id, user]) => ({
+            userId: user.userId,
+            nickname: user.nickname,
+            department: user.department,
+            isManager: user.isManager,
+            isSelf: id === clientId // 클라이언트 자신인지 확인
+        }));
+
+    ws.send(JSON.stringify({ type: 'userList', data: userList }));
+}
+
 // 초기 로그인 처리 함수 (Case 1.1, 2.1)
 function handleInitialSignIn(ws, clientId, department, nickname) {
     // department-nickname 쌍의 유일성 확인, Case 2.1 Denial
@@ -96,6 +118,9 @@ function handleInitialSignIn(ws, clientId, department, nickname) {
         type: 'newUser',
         data: { userId: newUserId, nickname, department }
     ,});
+
+    // 사용자 목록 업데이트를 모든 클라이언트에게 전송
+    broadcastUserList();
 }
 
 // 부서 변경 시 패스키 인증 및 사용자 데이터 교체 함수 (Case 1.2)
@@ -129,6 +154,9 @@ function handleChangeSignIn(ws, clientId, department, nickname, providedPasskey)
     }, userId);
 
     console.log('User changed department/nickname:', usersData[clientId]);
+
+    // 사용자 목록 업데이트를 모든 클라이언트에게 전송
+    broadcastUserList();
 }
 
 // Function to update user department, nickname, and passkey
@@ -375,3 +403,13 @@ app.use(express.static('public'));
 server.listen(3000, () => {
     console.log('서버가 포트 3000에서 실행 중입니다.');
 });
+
+// 사용자 목록을 모든 클라이언트에게 전송하는 함수
+function broadcastUserList() {
+    Object.keys(usersData).forEach((clientId) => {
+        const clientObj = clients.get(clientId);
+        if (clientObj && clientObj.ws.readyState === WebSocket.OPEN) {
+            sendUserList(clientObj.ws, clientId);
+        }
+    });
+}

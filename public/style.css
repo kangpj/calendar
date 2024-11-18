@@ -161,3 +161,8 @@ li { margin: 2.4px; }
   font-size: 14px;
   color: #FFD700;
 }
+
+.self-user {
+    font-weight: bold;
+    color: blue;
+}

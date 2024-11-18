@@ -88,6 +88,8 @@ socket.onmessage = (event) => {
         removeUserFromUI(message.data.userId);
     } else if (message.type === 'pong') {
         console.log(`#${appSeq++} Received pong from server`);
+    } else if (message.type === 'userList') {
+        updateUserList(message.data);
     }
 };
 
@@ -200,4 +202,21 @@ function removeUserFromUI(userId) {
     if (userItem) {
         userItem.remove();
     }
+}
+
+function updateUserList(userList) {
+    const userListContainer = document.getElementById('userList');
+    userListContainer.innerHTML = ''; // 기존 목록 초기화
+
+    userList.forEach(user => {
+        const userElement = document.createElement('div');
+        userElement.textContent = `${user.nickname} (${user.department})`;
+
+        if (user.isSelf) {
+            userElement.classList.add('self-user'); // CSS 클래스 추가
+            userElement.textContent += ' - You';
+        }
+
+        userListContainer.appendChild(userElement);
+    });
 }

@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Function to check if the user is already signed in
     function getStoredDepartment() {
         return localStorage.getItem('department');
     }
