@@ -118,33 +118,9 @@ function handleChangeSignIn(ws, clientId, department, nickname, providedPasskey)
         return;
     }
 
-    // 이전 부서에서 사용자 제거
-    const oldDepartment = user.department;
-    const userId = user.userId;
-    votesManager.removeUserFromDepartment(oldDepartment, userId);
+    updateUserDepartment(clientId, department, nickname, generatePasskey())
 
-    // 부서에 사용자가 더 이상 없으면 부서 데이터 제거
-    if (!votesManager.hasMembers(oldDepartment)) {
-        votesManager.removeDepartment(oldDepartment);
-    }
-
-    // 사용자 데이터 업데이트
-    user.department = department;
-    user.nickname = nickname;
-    // 새로운 패스키 생성하여 업데이트 (선택 사항)
-    user.passkey = generatePasskey();
-
-    // 새로운 부서에 사용자 추가
-    votesManager.addUserToDepartment(department, userId);
-
-    // 부서에 첫 번째 사용자라면 매니저로 지정
-    if (votesManager.isFirstUserInDepartment(department)) {
-        user.isManager = true;
-        votesManager.assignDepartmentManager(department, userId);
-        ws.send(JSON.stringify({ type: 'signInSuccess', message: '패스키 인증 후 성공적으로 로그인되었습니다.', passkey: user.passkey }));
-    } else {
-        ws.send(JSON.stringify({ type: 'signInSuccess', message: '패스키 인증 후 성공적으로 로그인되었습니다.', passkey: user.passkey }));
-    }
+    ws.send(JSON.stringify({ type: 'signInSuccess', message: '패스키 인증 후 성공적으로 로그인되었습니다.', passkey: user.passkey }));
 
     // 새로운 부서에 사용자 방송
     broadcastDepartmentMessage(department, {
@@ -154,6 +130,43 @@ function handleChangeSignIn(ws, clientId, department, nickname, providedPasskey)
 
     console.log('User changed department/nickname:', usersData[clientId]);
 }
+
+// Function to update user department, nickname, and passkey
+function updateUserDepartment(clientId, department, nickname, passkey) {
+    const user = usersData[clientId];
+    if (user) {
+        // Remove user from old department
+        const oldDepartment = user.department;
+        votesManager.removeUserFromDepartment(oldDepartment, user.userId);
+        // 부서에 사용자가 더 이상 없으면 부서 데이터 제거
+        if (!votesManager.hasMembers(oldDepartment)) {
+            votesManager.removeDepartment(oldDepartment);
+        }
+        // 부서에 첫 번째 사용자라면 매니저로 지정
+        if (votesManager.isFirstUserInDepartment(department)) {
+            user.isManager = true;
+            votesManager.assignDepartmentManager(department, user.userId);     
+        }        
+        // Update user data
+        user.department = department;
+        user.nickname = nickname;
+        user.passkey = passkey;
+        user.isAnonymous = false;
+
+        // Add user to new department
+        votesManager.addUserToDepartment(department, user.userId);
+
+        // Update client's department in the clients map
+        const clientObj = clients.get(clientId);
+        if (clientObj) {
+            clientObj.department = department;
+        }
+
+        console.log(`User ${user.userId} updated to department ${department}.`);
+    }
+}
+
+
 // Cleanly close a client connection and clear interval
 function closeClient(ws, clientId) {  
     if (clientId)  {
@@ -169,58 +182,21 @@ function closeClient(ws, clientId) {
 // Function to handle sign-in and update user department
 function handleSignIn(ws, clientId, department, nickname, passkey = null) {
     const user = usersData[clientId];
-
-    if (!user) {
-        // Case 1.1: New user registration
+    if (!user.passkey) {
+        // Case 1-1, 2-1
         handleInitialSignIn(ws, clientId, department, nickname);
-    } else if (user.isAnonymous) {
-        // Case 1.2: Anonymous user with existing data
-        if (passkey && user.passkey === passkey) {
-            updateUserDepartment(clientId, department, nickname);
-            ws.send(JSON.stringify({ type: 'signInSuccess', message: 'Successfully signed in.', department }));
-        } else {
-            ws.send(JSON.stringify({ type: 'signInFailed', message: 'Passkey authentication failed.' }));
-        }
     } else {
-        // Case 2: Known department-nickname pair
-        if (user.department === department && user.nickname === nickname) {
-            ws.send(JSON.stringify({ type: 'signInSuccess', message: 'Successfully signed in.', department }));
+        if (user.department === department && user.nickname === nickname && user.passkey === passkey) {
+            // Case 2-2-1
+            ws.send(JSON.stringify({ type: 'signInSuccess', message: 'Successfully signed in.', department, passkey }));
         } else {
-            // Allow department and nickname change with passkey verification
-            if (passkey && user.passkey === passkey) {
-                updateUserDepartment(clientId, department, nickname);
-                ws.send(JSON.stringify({ type: 'signInSuccess', message: 'Department and nickname updated successfully.', department }));
-            } else {
-                ws.send(JSON.stringify({ type: 'signInFailed', message: 'Passkey authentication failed or department-nickname pair already registered.' }));
-            }
-        }
+            // Case 1-2
+            handleChangeSignIn(ws, clientId, department,nickname, passkey);
+        }        
     }
 }
 
-// Function to update user department and nickname
-function updateUserDepartment(clientId, department, nickname) {
-    const user = usersData[clientId];
-    if (user) {
-        // Remove user from old department
-        const oldDepartment = user.department;
-        votesManager.removeUserFromDepartment(oldDepartment, user.userId);
 
-        // Update user data
-        user.department = department;
-        user.nickname = nickname;
-
-        // Add user to new department
-        votesManager.addUserToDepartment(department, user.userId);
-
-        // Update client's department in the clients map
-        const clientObj = clients.get(clientId);
-        if (clientObj) {
-            clientObj.department = department;
-        }
-
-        console.log(`User ${user.userId} updated to department ${department}.`);
-    }
-}
 
 // WebSocket 연결 시 메시지 핸들러 설정
 wss.on('connection', (ws, req) => {
