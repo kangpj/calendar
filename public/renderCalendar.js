@@ -1,8 +1,8 @@
 // public/renderCalendar2.js
 
 
-function renderCalendar(containerId, votesData, userId) {
-    const calendarContainer = document.getElementById(containerId);
+function renderCalendar(votesData, userId) {
+    const calendarContainer = document.getElementById('calendar');
     calendarContainer.innerHTML = ''; // Clear any existing content
     
     //const userId = getToken('userId');
