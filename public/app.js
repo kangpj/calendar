@@ -25,6 +25,8 @@ const departmentAnonInput = document.getElementById('departmentAnonInput');
 
 
 //const users         = new Set();
+
+const calendars     = {};
 const clients       = new Set();
 const currentYear   = new Date().getFullYear();
 const currentMonth  = new Date().getMonth() + 1;
@@ -109,6 +111,12 @@ socket.onmessage = (event) => {
         case 'userLoggedOut':
             handleUserLoggedOut(message.data.userId);
             break;
+        case 'members':
+            console.log('members 메시지 수신:', updateMemberList(message.data.members));
+            break;
+        case 'pong':
+            console.log('pong 메시지 수신:', message.message);
+            break;                            
         case 'error':
             alert(`오류: ${message.message}`);
             break;
