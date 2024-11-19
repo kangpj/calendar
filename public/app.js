@@ -204,6 +204,7 @@ anonymousBtn.addEventListener('click', () => {
 logoutBtn.addEventListener('click', () => {
     socket.send(JSON.stringify({ type: 'logout' }));
 });
+
 // Listen for incoming chat messages
 socket.addEventListener('message', (event) => {
     const parsedMessage = JSON.parse(event.data);
