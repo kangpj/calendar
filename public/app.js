@@ -75,7 +75,7 @@ socket.onmessage = (event) => {
     } else if (message.type === 'updateVotes') {
         const userId = getToken('userId');
         renderCalendar('calendar', message.data, userId);
-    } else if (message.type === 'newUser') {
+    } else if (message.type === 'newClient') {
         console.log(`New user signed in: ${message.data.nickname} (${message.data.userId}) in department ${message.data.department}`);
         addUserToUI(message.data);
         const department = message.data.department;

@@ -2,21 +2,21 @@
 const http = require('http');
 const WebSocket = require('ws');
 const express = require('express');
-const app = express();
-
-// votesManager는 별도의 모듈
 const votesManager = require('./votesManager'); 
 
+// 서버 생성 및 WebSocket 설정
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
 // 사용자 데이터 저장소
-let usersData = {}; 
+// let usersData = {}; 
 // 형식: { clientId: { userId, nickname, department, isManager, isAnonymous, passkey } }
 
 // 클라이언트 관리: clientId를 키로 하는 Map
-const clients = new Map();
+// const clients = new Map();
 
-// 서버 생성 및 WebSocket 설정
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+
 
 // 현재 연도 및 월 설정
 let year = new Date().getFullYear();
@@ -236,81 +236,68 @@ wss.on('connection', (ws, req) => {
     const   currentClientIP     = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     let     currentClientId     = null;
     let     currentUserId       = null;
-    let     currentDepartment   = 'default'; // 초기 부서를 default로 설정
+    let     currentDepartment   = 'float'; // 초기 부서를 float으로 설정
 
     console.log(`#${logSeq++} New client connected: from ${currentClientIP}`);
 
-    ws.on('message', (message) => {
+    ws.on('message', async (message) => {
         try {
             const parsedMessage = JSON.parse(message);
 
             if (parsedMessage.type === 'init') {
                 currentClientId = parsedMessage.clientId;
-                console.log(`#${logSeq++} New client initialized with clientId: ${currentClientId}`);
+                const department = parsedMessage.department || 'float'; // Allow dynamic department
+                const isAnonymous = parsedMessage.isAnonymous || false;
+                let nickname = null;
+                let passkey = null;
 
-                // 클라이언트로부터 유저 데이터를 아직 받지 않은 경우 자동으로 익명 사용자 등록
-                if (!usersData[currentClientId]) {
-                    const newUserId = generateUserId();
-                    usersData[currentClientId] = { 
-                        userId: newUserId, 
-                        isAnonymous: true, // Set to true on init
-                        passkey: null // 패스키 초기화
-                    };
-                    console.log(`Assigned new anonymous userId: ${newUserId} to clientId: ${currentClientId}`);
-                    
-                    // Respond currentUserId to the client so that he can write down it on its localStorage
-                    // The userId is needed to figure out which data is its own.
-                    // Because every json votesData regarding a client is identified by its userId.
-                    ws.send(JSON.stringify({ type: 'setUserId', data: usersData[currentClientId] }));
-                } else {
-                    // If user data exists, ensure isAnonymous is set to true
-                    usersData[currentClientId].isAnonymous = true;
-                }
-                // Step 3. Now that usersData was set, we can access usersData
-                currentUserId = usersData[currentClientId].userId;
-
-                // 클라이언트 객체 생성 및 Map에 추가
-                clients.set(currentClientId, {
-                    ws:             ws,
-                    ip:             currentClientIP,
-                    secretNumber:   generateClientSecret(currentClientId),
-                    department:     'default' // 부서 필드 추가
-                });
-
-                // 기본 부서의 현재 멤버 목록 조회
-                const defaultMembers = votesManager.getDepartmentMembers('default');
-
-                // 클라이언트에게 기본 부서 멤버 목록 전송
-                ws.send(JSON.stringify({
-                    type: 'defaultMembers',
-                    data: defaultMembers
-                }));
-
-                // 최초 메시지로 투표 상태 전송
-                ws.send(JSON.stringify({
-                    type: 'updateVotes',
-                    data: votesManager.getAllVotes('default', year, month)
-                }));
-
-                // 전체 전달
-                broadcastDepartmentMessage('default', {
-                    type: 'newUser',
-                    data: { 
-                        userId: usersData[currentClientId].userId, 
-                        department: 'default',
-                        nickname: usersData[currentClientId].nickname || '익명'
+                if (!isAnonymous) {
+                    nickname = parsedMessage.nickname;
+                    passkey = parsedMessage.passkey;
+                    if (!nickname || !passkey) {
+                        throw new Error('닉네임과 패스키는 필수 입력 사항입니다.');
                     }
-                }, currentUserId);
-            
-            // signIn message can bump into four cases
-            // Case 1. Sign In with unknown department/nickname from a client pc 
-            //  Case 1-1. There isn't user data with regard to current client: Register user department, nickname and passkey
-            //  Case 1-2. There is user data with regard to current client: Authenticate passkey then replace user data with new one 
-            // Case 2. Sign In with known department/nickname from a client pc
-            //  Case 2-1. There isn't user data with regard to current client: denial due to singularity violation
-            //  Case 2-2. There is user data with regard to current client
-            //      Case 2-2-1. User datas are the same each other: signIn success
-            //      Case 2-2-1. User datas are different each other: signIn failure                  
+                }
+
+                console.log(`#${logSeq++} New client initialized with clientId: ${currentClientId}, Anonymous: ${isAnonymous}`);
+
+                // 사용자 추가
+                const user = await votesManager.addUser(currentClientId, department, nickname, passkey, isAnonymous);
+                currentUserId = user.userId;
+
+                // setUserId 메시지 전송 (only for authenticated users)
+                if (!isAnonymous) {
+                    ws.send(JSON.stringify({ type: 'setUserId', data: user.userId }));
+                }
+
+                // members 목록 전송
+                const members = votesManager.getMembersByDepartment(department);
+                ws.send(JSON.stringify({ type: 'members', data: members }));
+
+                // 전체 votes 전송
+                const date = new Date();
+                const year = date.getFullYear();
+                const month = date.getMonth() + 1;
+                const votes = votesManager.getAllVotes(department, year, month);
+                ws.send(JSON.stringify({ type: 'updateVotes', data: votes }));
+
+                // 새로운 클라이언트가 추가되었음을 다른 클라이언트들에게 알림
+                wss.clients.forEach(client => {
+                    if (client.readyState === WebSocket.OPEN && client !== ws) {
+                        const clientData = votesManager.getUserByClientId(currentClientId);
+                        if (clientData && clientData.department === department) {
+                            client.send(JSON.stringify({ 
+                                type: 'newClient', 
+                                data: { 
+                                    userId: user.userId, 
+                                    nickname: user.nickname, 
+                                    department: user.department,
+                                    isAnonymous: clientData.isAnonymous
+                                } 
+                            }));
+                        }
+                    }
+                });
             } else if (parsedMessage.type === 'signIn') {
                 const { department, nickname, passkey } = parsedMessage.data;
                 handleSignIn(ws, currentClientId, department, nickname, passkey);
@@ -329,7 +316,6 @@ wss.on('connection', (ws, req) => {
                         if (!votesManager.hasMembers(department)) {
                             votesManager.removeDepartment(department);
                         }
-
                         // 부서에 사용자가 로그아웃했음을 방송
                         broadcastDepartmentMessage(department, {
                             type: 'userLoggedOut',
@@ -391,12 +377,30 @@ wss.on('connection', (ws, req) => {
             }
         } catch (error) {
             console.error('Error processing message:', error);
+            ws.send(JSON.stringify({ type: 'error', message: error.message }));
         }
     });
+    ws.on('close', () => {
+        console.log(`#${logSeq++} Client disconnected: ${currentClientId}`);
+        if (currentUserId) {
+            const userData = votesManager.getUserByClientId(currentClientId);
+            if (userData) {
+                votesManager.removeUserFromDepartment(userData.department, currentUserId);
+                // usersData에서 해당 clientId 제거
+                votesManager.usersData.delete(currentClientId);
 
-    ws.on('close', () => closeClient(ws, currentClientId));
-
-
+                // 다른 클라이언트에게 로그아웃 알림
+                wss.clients.forEach(client => {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(JSON.stringify({ 
+                            type: 'userLoggedOut', 
+                            data: { userId: currentUserId } 
+                        }));
+                    }
+                });
+            }
+        }
+    });
 });
 
 

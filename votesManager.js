@@ -2,16 +2,25 @@
 
 // Using a Map to store departments for efficient key-based management
 //const departments = new Map();
-
+const bcrypt = require('bcrypt');
 // 사용자 데이터가 서버에서 관리되므로, 서버에서 관리하는 usersData와 연동 필요
-const usersData = {}; // 서버에서 클라이언트와 연동되는 사용자 데이터를 관리
+//const users = new Map();
+//const usersData = new Map(); // 서버에서 클라이언트와 연동되는 사용자 데이터를 관리
 
 class VotesManager {
     constructor() {
         // Initialize a Map to store department data
+        this.userIdCounter = 1;
+        this.users = new Map();
+        this.usersData = new Map();
         this.departments = new Map();
         this.defaultDepartmentId = "default";
         this.initializeDepartment(this.defaultDepartmentId);
+    }
+    
+    // 간단한 userId 생성 함수
+    generateUserId() {
+       return `user_${userIdCounter++}`;
     }
 
     // Initialize a department with default structure
@@ -53,6 +62,56 @@ class VotesManager {
         const department = this.departments.get(departmentId);
         department.members.add(userId);
         console.log(`User ${userId} added to department ${departmentId}.`, this.departments);
+    }
+   /**
+    * 사용자 추가 함수
+    * @param {string} clientId - 클라이언트 ID
+    * @param {string} department - 부서 이름
+    * @param {string} [nickname] - 닉네임 (익명 사용 시 생략)
+    * @param {string} [passkey] - 패스키 (익명 사용 시 생략)
+    * @param {boolean} [isAnonymous=false] - 익명 여부
+    * @returns {Object} - 새로 추가된 사용자 객체
+    */
+   async  addUser(clientId, department, nickname = null, passkey = null, isAnonymous = false) {
+        if (!isAnonymous) {
+            if (!nickname || !passkey) {
+                throw new Error('닉네임과 패스키는 필수 입력 사항입니다.');
+            }
+
+            const isTaken = isNicknameTaken(department, nickname);
+        
+            if (isTaken) {
+                throw new Error('닉네임이 이미 사용 중입니다.');
+            }
+            
+            const hashedPasskey = await bcrypt.hash(passkey, 10);
+            const userId = generateUserId();
+            const newUser = {
+                userId,
+                department,
+                nickname,
+                passkey: hashedPasskey,
+                votes: []
+            };
+            users.set(userId, newUser);
+            usersData.set(clientId, { userId, department, isAnonymous: false });
+            return newUser;
+        } else {
+            // Handle anonymous user
+            const userId = generateUserId();
+            const anonymousNickname = `Guest_${Math.floor(Math.random() * 10000)}`; // Generate a random nickname for display
+            
+            const newUser = {
+                userId,
+                department,
+                nickname: anonymousNickname,
+                passkey: null, // No passkey for anonymous users
+                votes: []
+            };
+            users.set(userId, newUser);
+            usersData.set(clientId, { userId, department, isAnonymous: true });
+            return newUser;
+        }
     }
 
     // Remove a user from a department
@@ -209,22 +268,28 @@ class VotesManager {
         return true;
     }
 
-    // Check if a nickname is taken in a department
-    isNicknameTaken(departmentId, nickname) {
-        const lowerNickname = nickname.toLowerCase();
-        const department = this.departments.get(departmentId);
-        if (!department) {
-            console.error(`Department ${departmentId} does not exist.`);
-            return false;
+
+       /**
+    * 특정 부서 내에서 닉네임이 이미 사용 중인지 확인하고, 알파벳 문자만 포함하는지 검증
+    * @param {string} department - 현재 부서 이름
+    * @param {string} nickname - 입력된 닉네임
+    * @returns {Object} - { isTaken: boolean, isValid: boolean }
+    */
+    isNicknameTaken(department, nickname) {
+    const lowerNickname = nickname.toLowerCase();
+    let isTaken = false;
+    
+    for (let user of users.values()) {
+        if (user.department === department && user.nickname.toLowerCase() === lowerNickname) {
+            isTaken = true;
+            break;
         }
-        for (let userId of department.members) {
-            const user = usersData[userId];
-            if (user && user.nickname.toLowerCase() === lowerNickname) {
-                return true;
-            }
-        }
-        return false;
     }
+
+    //const isValid = isAlphabetic(nickname);
+    
+    return isTaken;//{ isTaken, isValid };
+}
 
     // Check if a department has members
     hasMembers(departmentId) {
@@ -244,6 +309,84 @@ class VotesManager {
     getDepartmentMembers(departmentId) {
         const department = this.departments.get(departmentId);
         return department ? Array.from(department.members) : [];
+    }
+
+    /**
+     * 특정 클라이언트 ID로 사용자 정보를 조회하는 함수
+     * @param {string} clientId - 조회할 클라이언트 ID
+     * @returns {Object|null} - 사용자 정보 객체 또는 존재하지 않을 경우 null
+     */
+    getUserData(clientId) {
+        if (!clientId) {
+            console.warn('getUser 호출 시 clientId가 제공되지 않았습니다.');
+            return null;
+        }
+
+        const userData = usersData.get(clientId);
+
+        if (!userData) {
+            console.warn(`클라이언트 ID '${clientId}'에 해당하는 사용자를 찾을 수 없습니다.`);
+            return null;
+        }
+   
+        return userData;
+    }
+
+    /**
+     * 특정 사용자 ID로 사용자 정보를 조회하는 함수
+     * @param {string} userId - 조회할 사용자 ID
+     * @returns {Object|null} - 사용자 정보 객체 또는 존재하지 않을 경우 null
+     */
+    getUser(userId) {
+        if (!userId) {
+            console.warn('getUser 호출 시 userId가 제공되지 않았습니다.');
+            return null;
+        }
+
+        const user = users.get(userId);
+
+        if (!user) {
+            console.warn(`사용자 ID '${userId}'에 해당하는 사용자를 찾을 수 없습니다.`);
+            return null;
+        }
+
+        // 필요한 경우 사용자 정보에서 민감한 데이터를 제외하고 반환
+        const { passkey, ...safeUserData } = user;
+        return safeUserData;
+    }
+
+    /**
+     * 특정 클라이언트 ID로 사용자 정보를 조회하는 함수
+     * @param {string} clientId - 조회할 클라이언트 ID
+     * @returns {Object|null} - 사용자 정보 객체 또는 존재하지 않을 경우 null
+     */
+    getUserByClientId(clientId) {
+        if (!clientId) {
+            console.warn('getUserByClientId 호출 시 clientId가 제공되지 않았습니다.');
+            return null;
+        }
+
+        const userData = usersData.get(clientId);
+
+        if (!userData) {
+            console.warn(`클라이언트 ID '${clientId}'에 해당하는 사용자를 찾을 수 없습니다.`);
+            return null;
+        }
+
+        const user = users.get(userData.userId);
+
+        if (!user) {
+            console.warn(`사용자 ID '${userData.userId}'에 해당하는 사용자를 찾을 수 없습니다.`);
+            return null;
+        }
+
+        // 민감한 정보 제외
+        const { passkey, ...safeUserData } = user;
+        return {
+            ...safeUserData,
+            clientId: clientId,
+            isAnonymous: userData.isAnonymous
+        };
     }
 }
 
