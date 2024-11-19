@@ -35,6 +35,7 @@ let workingMonth    = currentMonth;
 let mostVotedDay    = null;
 let maxVotes        = 0;
 let isConnected     = false;
+let appSeq          = 1;
 
 // WebSocket 연결 상태 표시
 wsStatus.textContent = "연결상태: ";
