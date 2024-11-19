@@ -1,57 +1,45 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Calendar</title>
+    <title>투표 애플리케이션</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        #authModal {
-            display: none;
-            /* 기타 스타일 유지 */
-        }
-    </style>
 </head>
 <body>
-    <div id="envelope">
-        <ul>
-            <li id="wsStatus"></li>
-            <li id="whatfor">다수결로 모임 날짜를 정하는 달력입니다.</li>
-            <li id="caption"></li>
-            <li id="mostVotedDay"></li>
-            <li id="participant"></li>
-        </ul>
-    </div>
-    <div id="calendar"></div>
-    <!-- Top-right corner token -->
-    <div id="key">🔑</div>
-    <div id="lock" style="display: none;">🔒</div> <!-- 초기에는 숨김 -->
-
-    <!-- Modal for Sign-in -->
-    <div id="authModal">
-        <label>Department: <input type="text" id="departmentInput"></label>
-        <label>Nickname: <input type="text" id="nicknameInput"></label>
-        <button id="signInBtn">Sign In</button>
-    </div>
-    <button id="resetVotesBtn" style="display: none;">Reset Votes</button>
-    <div id="chat-section">
-        <div id="chat-container" class="chat-container">
-            <!-- Chat messages will appear here -->
+    <!-- 로그인/익명 모달 -->
+    <div id="authModal" class="modal">
+        <h2>로그인 또는 익명 사용</h2>
+        <div id="signInSection">
+            <input type="text" id="departmentInput" placeholder="부서">
+            <input type="text" id="nicknameInput" placeholder="닉네임">
+            <input type="password" id="passkeyInput" placeholder="패스키">
+            <button id="signInBtn">로그인</button>
         </div>
-        <input type="text" id="chat-input" placeholder="Type your message here..." />
-        <button id="send-chat-btn">Send</button>
+        <div id="anonymousSection">
+            <input type="text" id="departmentAnonInput" placeholder="부서">
+            <button id="anonymousBtn">익명으로 사용하기</button>
+        </div>
     </div>
-    <script src="app.js"></script>
-    <script src="renderCalendar.js"></script>
+
+    <!-- 로그아웃 버튼 -->
+    <button id="logoutBtn" style="display: none;">로그아웃</button>
+
+    <!-- 멤버 목록 표시 -->
+    <div id="membersContainer">
+        <h3>기본 부서 멤버</h3>
+        <ul id="membersList"></ul>
+    </div>
+
+    <!-- 캘린더 및 기타 UI 요소 -->
+    <div id="calendar"></div>
+    <div id="participant"></div>
+    <div id="mostVotedDay"></div>
+    <div id="wsStatus"></div>
+    <div id="caption"></div>
+    <button id="resetVotesBtn" style="display: none;">투표 초기화</button>
+
+    <!-- 스크립트 -->
     <script src="signIn.js"></script>
-
-
-    <!-- 사용자 목록 표시를 위한 요소 추가 -->
-    <div id="userListContainer">
-        <h3>부서 멤버</h3>
-        <ul id="userList">
-            <!-- 사용자 목록이 여기에 추가됩니다 -->
-        </ul>
-    </div>
+    <script src="app.js"></script>
 </body>
 </html>

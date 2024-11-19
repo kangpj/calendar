@@ -78,14 +78,14 @@ class VotesManager {
                 throw new Error('닉네임과 패스키는 필수 입력 사항입니다.');
             }
 
-            const isTaken = isNicknameTaken(department, nickname);
+            const isTaken = this.isNicknameTaken(department, nickname);
         
             if (isTaken) {
                 throw new Error('닉네임이 이미 사용 중입니다.');
             }
             
             const hashedPasskey = await bcrypt.hash(passkey, 10);
-            const userId = generateUserId();
+            const userId = this.generateUserId();
             const newUser = {
                 userId,
                 department,
@@ -98,7 +98,7 @@ class VotesManager {
             return newUser;
         } else {
             // Handle anonymous user
-            const userId = generateUserId();
+            const userId = this.generateUserId();
             const anonymousNickname = `Guest_${Math.floor(Math.random() * 10000)}`; // Generate a random nickname for display
             
             const newUser = {
@@ -113,7 +113,24 @@ class VotesManager {
             return newUser;
         }
     }
-
+    /**
+     * 특정 부서에 사용자를 제거하는 함수
+     * @param {string} department - 부서 이름
+     * @param {string} userId - 제거할 사용자 ID
+     */
+    removeUserFromUsers(department, userId) {
+        const user = users.get(userId);
+        if (user && user.department === department) {
+            users.delete(userId);
+            // Remove from usersData
+            for (let [clientId, userData] of usersData.entries()) {
+                if (userData.userId === userId && userData.department === department) {
+                    usersData.delete(clientId);
+                    break;
+                }
+            }
+        }
+    }
     // Remove a user from a department
     removeUserFromDepartment(departmentId, userId) {
         const department = this.departments.get(departmentId);
