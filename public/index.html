@@ -2,10 +2,25 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>투표 애플리케이션</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Calendar</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="envelope">
+        <ul>
+            <li id="wsStatus"></li>
+            <li id="whatfor">다수결로 모임 날짜를 정하는 달력입니다.</li>
+            <li id="caption"></li>
+            <li id="mostVotedDay"></li>
+            <li id="participant"></li>
+        </ul>
+    </div>
+    <div id="calendar"></div>
+    <!-- Top-right corner token -->
+    <div id="key">🔑</div>
+    <div id="lock" style="display: none;">🔒</div> <!-- 초기에는 숨김 -->
+
     <!-- 로그인/익명 모달 -->
     <div id="authModal" class="modal">
         <h2>로그인 또는 익명 사용</h2>
@@ -21,6 +36,18 @@
         </div>
     </div>
 
+    <button id="resetVotesBtn" style="display: none;">Reset Votes</button>
+    <div id="chat-section">
+        <div id="chat-container" class="chat-container">
+            <!-- Chat messages will appear here -->
+        </div>
+        <input type="text" id="chat-input" placeholder="Type your message here..." />
+        <button id="send-chat-btn">Send</button>
+    </div>
+    <script src="app.js"></script>
+    <script src="renderCalendar.js"></script>
+    <script src="signIn.js"></script>
+
     <!-- 로그아웃 버튼 -->
     <button id="logoutBtn" style="display: none;">로그아웃</button>
 
@@ -29,18 +56,5 @@
         <h3>기본 부서 멤버</h3>
         <ul id="membersList"></ul>
     </div>
-
-    <!-- 캘린더 및 기타 UI 요소 -->
-    <div id="calendar"></div>
-    <div id="participant"></div>
-    <div id="mostVotedDay"></div>
-    <div id="wsStatus"></div>
-    <div id="caption"></div>
-    <button id="resetVotesBtn" style="display: none;">투표 초기화</button>
-
-    <!-- 스크립트 -->
-    <script src="renderCalendar.js"></script>  
-    <script src="signIn.js"></script>
-    <script src="app.js"></script>
 </body>
 </html>

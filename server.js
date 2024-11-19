@@ -271,7 +271,7 @@ wss.on('connection', (ws, req) => {
                 }
 
                 // members 목록 전송
-                const members = votesManager.getMembersByDepartment(department);
+                const members = votesManager.getDepartmentMembers(department);
                 ws.send(JSON.stringify({ type: 'members', data: members }));
 
                 // 전체 votes 전송
