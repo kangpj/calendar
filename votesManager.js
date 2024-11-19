@@ -20,7 +20,7 @@ class VotesManager {
     
     // 간단한 userId 생성 함수
     generateUserId() {
-       return `user_${userIdCounter++}`;
+       return `user_${this.userIdCounter++}`;
     }
 
     // Initialize a department with default structure
