@@ -1,6 +1,7 @@
 // public/app.js
 
-const socket = new WebSocket('ws://yourserveraddress/ws/'); // 실제 서버 주소으로 변경 필요
+let socket        = new WebSocket('wss://piljoong.kr/ws/');
+
 
 // UI 요소들
 const wsStatus      = document.getElementById('wsStatus');
