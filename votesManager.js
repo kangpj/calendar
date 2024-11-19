@@ -93,8 +93,8 @@ class VotesManager {
                 passkey: hashedPasskey,
                 votes: []
             };
-            users.set(userId, newUser);
-            usersData.set(clientId, { userId, department, isAnonymous: false });
+            this.users.set(userId, newUser);
+            this.usersData.set(clientId, { userId, department, isAnonymous: false });
             return newUser;
         } else {
             // Handle anonymous user
@@ -108,8 +108,8 @@ class VotesManager {
                 passkey: null, // No passkey for anonymous users
                 votes: []
             };
-            users.set(userId, newUser);
-            usersData.set(clientId, { userId, department, isAnonymous: true });
+            this.users.set(userId, newUser);
+            this.usersData.set(clientId, { userId, department, isAnonymous: true });
             return newUser;
         }
     }
@@ -119,13 +119,13 @@ class VotesManager {
      * @param {string} userId - 제거할 사용자 ID
      */
     removeUserFromUsers(department, userId) {
-        const user = users.get(userId);
+        const user = this.users.get(userId);
         if (user && user.department === department) {
-            users.delete(userId);
+            this.users.delete(userId);
             // Remove from usersData
-            for (let [clientId, userData] of usersData.entries()) {
+            for (let [clientId, userData] of this.usersData.entries()) {
                 if (userData.userId === userId && userData.department === department) {
-                    usersData.delete(clientId);
+                    this.usersData.delete(clientId);
                     break;
                 }
             }
@@ -296,7 +296,7 @@ class VotesManager {
     const lowerNickname = nickname.toLowerCase();
     let isTaken = false;
     
-    for (let user of users.values()) {
+    for (let user of this.users.values()) {
         if (user.department === department && user.nickname.toLowerCase() === lowerNickname) {
             isTaken = true;
             break;
@@ -339,7 +339,7 @@ class VotesManager {
             return null;
         }
 
-        const userData = usersData.get(clientId);
+        const userData = this.usersData.get(clientId);
 
         if (!userData) {
             console.warn(`클라이언트 ID '${clientId}'에 해당하는 사용자를 찾을 수 없습니다.`);
@@ -360,7 +360,7 @@ class VotesManager {
             return null;
         }
 
-        const user = users.get(userId);
+        const user = this.users.get(userId);
 
         if (!user) {
             console.warn(`사용자 ID '${userId}'에 해당하는 사용자를 찾을 수 없습니다.`);
@@ -383,14 +383,14 @@ class VotesManager {
             return null;
         }
 
-        const userData = usersData.get(clientId);
+        const userData = this.usersData.get(clientId);
 
         if (!userData) {
             console.warn(`클라이언트 ID '${clientId}'에 해당하는 사용자를 찾을 수 없습니다.`);
             return null;
         }
 
-        const user = users.get(userData.userId);
+        const user = this.users.get(userData.userId);
 
         if (!user) {
             console.warn(`사용자 ID '${userData.userId}'에 해당하는 사용자를 찾을 수 없습니다.`);
