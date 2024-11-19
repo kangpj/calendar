@@ -247,7 +247,7 @@ wss.on('connection', (ws, req) => {
             if (parsedMessage.type === 'init') {
                 currentClientId = parsedMessage.clientId;
                 const department = parsedMessage.department || 'float'; // Allow dynamic department
-                const isAnonymous = parsedMessage.isAnonymous || false;
+                const isAnonymous = parsedMessage.isAnonymous || true;
                 let nickname = null;
                 let passkey = null;
 
