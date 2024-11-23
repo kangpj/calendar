@@ -130,12 +130,15 @@ socket.onmessage = (event) => {
 function updateMemberList(members) {
     const memberList = document.getElementById('membersList');
     membersList.innerHTML = ''; // Clear existing list
-    members.forEach(member => {
-        const userItem = document.createElement('li');
-        userItem.id = `${member.userId}`;
-        userItem.textContent = `${member.nickname}`;
-        membersList.appendChild(userItem);
-    });
+    if (members) {
+        members.forEach(member => {
+            const userItem = document.createElement('li');
+            userItem.id = `${member.userId}`;
+            userItem.textContent = `${member.nickname}`;
+            membersList.appendChild(userItem);
+        });
+    }
+    
 }
 
 /**

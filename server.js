@@ -325,7 +325,8 @@ wss.on('connection', (ws, req) => {
                 }
             } else if (parsedMessage.type === 'ping') {
                 ws.send(JSON.stringify({
-                    type: 'pong'
+                    type: 'pong',
+                    message: 'OK'
                 }));
             } else if (parsedMessage.type === 'vote') {
                 const { year, month, day, userId } = parsedMessage.data;
