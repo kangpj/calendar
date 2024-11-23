@@ -128,13 +128,13 @@ socket.onmessage = (event) => {
 
 // Update the member list UI
 function updateMemberList(members) {
-    const memberList = document.getElementById('memberList');
-    memberList.innerHTML = ''; // Clear existing list
+    const memberList = document.getElementById('membersList');
+    membersList.innerHTML = ''; // Clear existing list
     members.forEach(member => {
         const userItem = document.createElement('li');
         userItem.id = `${member.userId}`;
         userItem.textContent = `${member.nickname}`;
-        memberList.appendChild(userItem);
+        membersList.appendChild(userItem);
     });
 }
 
