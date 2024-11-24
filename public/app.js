@@ -1,7 +1,7 @@
 // public/app.js
 
 
-let socket        = new WebSocket('wss://piljoong.kr/ws/');
+let socket        = new WebSocket('wss://localhost/ws/');
 
 
 const voteCount     = document.getElementById('participant');
@@ -232,7 +232,7 @@ socket.addEventListener('message', (event) => {
  */
 function handleSetUserId(userId) {
     console.log('setUserId 메시지 수신:', userId);
-    storeUserId(userId);
+    localStorage.setItem('userId', userId);
 }
 // Function to display chat messages in the UI
 function displayChatMessage(senderId, message, timestamp) {
