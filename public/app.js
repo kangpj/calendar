@@ -118,7 +118,7 @@ socket.onmessage = (event) => {
             handleUserLoggedOut(message.data.userId);
             break;
         case 'userList':
-            console.log('userList 메시지 수신:', updateMemberList(message.data.members));
+            console.log('userList 메시지 수신:', updateMemberList(message.data));
             break;
         case 'pong':
             console.log('pong 메시지 수신:', message.message);

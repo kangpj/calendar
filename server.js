@@ -92,9 +92,14 @@ function sendUserList(ws, clientId) {
 }
 
 // 사용자 목록을 모든 클라이언트에게 전송하는 함수
-function broadcastUserList() {
+function broadcastUserList(departmentId = 'all') {
     const allUsers = votesManager.getAllUsers();
-    broadcastMessage('userList', allUsers);
+
+    if (departmentId === 'all') {
+        broadcastMessage('userList', allUsers);
+    } else {
+        broadcastMessage('userList', allUsers.filter(user => user.department === departmentId));
+    }
 }
 
 // WebSocket 연결 핸들링
@@ -128,7 +133,7 @@ wss.on('connection', (ws, req) => {
                 sendMessage(ws, 'initSuccess', newUser);
 
                 // Broadcast updated user list to all clients
-                broadcastUserList();
+                broadcastUserList('float');
                 return;
             }
 
@@ -161,9 +166,10 @@ wss.on('connection', (ws, req) => {
 
                 // After updating stats, broadcast the updated user list
                 broadcastUserList();
+            } 
+            else if (parsedMessage.type === 'ping') {
+                sendMessage(ws, 'pong', { message: 'OK' });
             }
-
-            // Handle unknown message types
             else {
                 sendMessage(ws, 'error', { message: `Unknown message type: ${parsedMessage.type}` });
             }

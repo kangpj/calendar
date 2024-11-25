@@ -717,6 +717,14 @@ class VotesManager {
 
         return result;
     }
+
+    /**
+     * 모든 사용자를 가져오는 함수
+     * @returns {Array} - 모든 사용자 리스트
+     */
+    getAllUsers() {
+        return Array.from(this.users.values());
+    }
 }
 
 module.exports = new VotesManager();
