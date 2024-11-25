@@ -17,37 +17,67 @@ let year = new Date().getFullYear();
 let month = new Date().getMonth() + 1; // 1-12 범위로 수정
 let logSeq = 0;
 
+/**
+ * Sends a structured message to a specific WebSocket client.
+ * @param {WebSocket} ws - The WebSocket connection to send the message through.
+ * @param {string} type - The type/category of the message.
+ * @param {Object} data - The payload of the message.
+ */
+function sendMessage(ws, type, data) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        console.error(`Cannot send message, WebSocket is not open. Type: '${type}'`);
+        return;
+    }
+
+    const message = { type, data };
+    ws.send(JSON.stringify(message), (err) => {
+        if (err) {
+            console.error(`Error sending message of type '${type}':`, err);
+        } else {
+            console.log(`Sent message of type '${type}':`, data);
+        }
+    });
+}
+
+/**
+ * Broadcasts a structured message to all connected WebSocket clients.
+ * @param {string} type - The type/category of the message.
+ * @param {Object} data - The payload of the message.
+ * @param {Array<string>} excludeClientIds - (Optional) Array of clientIds to exclude from broadcasting.
+ */
+function broadcastMessage(type, data, excludeClientIds = []) {
+    const message = { type, data };
+    const messageString = JSON.stringify(message);
+    clients.forEach((clientObj, clientId) => {
+        if (
+            clientObj.ws.readyState === WebSocket.OPEN &&
+            !excludeClientIds.includes(clientId)
+        ) {
+            clientObj.ws.send(messageString, (err) => {
+                if (err) {
+                    console.error(`Error broadcasting message of type '${type}' to client '${clientId}':`, err);
+                }
+            });
+        }
+    });
+    console.log(`Broadcasted message of type '${type}' to all clients:`, data);
+}
+
 // 헬퍼 함수: 사용자 로그인 상태 확인
 function isUserSignedIn(clientId) {
     const user = votesManager.getUserData(clientId);
     return user && !user.isAnonymous;
 }
 
-// 부서에 메시지 방송 함수 (clientIdCur 제외)
-function broadcastDepartmentMessage(department, message, clientIdCur = null) {
-    const messageString = JSON.stringify(message);
-    clients.forEach((clientObj, clientId) => {
-        const user = votesManager.getUserData(clientId);
-        if (
-            user &&
-            user.department === department &&
-            clientObj.ws.readyState === WebSocket.OPEN &&
-            clientId !== clientIdCur
-        ) {
-            clientObj.ws.send(messageString);
-        }
-    });
-}
-
 // 사용자 목록을 특정 클라이언트에게 전송하는 함수
 function sendUserList(ws, clientId) {
     const userData = votesManager.getUserData(clientId);
     if (!userData) {
-        ws.send(JSON.stringify({ type: 'error', message: '사용자 데이터가 없습니다.' }));
+        sendMessage(ws, 'error', { message: '사용자 데이터가 없습니다.' });
         return;
     }
 
-    const targetDepartments = [userData.department, 'default']; // 자신의 부서와 기본 부서
+    const targetDepartments = [userData.department, 'float']; // 자신의 부서와 기본 부서
     const userList = votesManager.getAllUsers()
         .filter(user => targetDepartments.includes(user.department))
         .map(user => ({
@@ -58,16 +88,13 @@ function sendUserList(ws, clientId) {
             isSelf: user.clientId === clientId // 클라이언트 자신인지 확인
         }));
 
-    ws.send(JSON.stringify({ type: 'userList', data: userList }));
+    sendMessage(ws, 'userList', userList);
 }
 
 // 사용자 목록을 모든 클라이언트에게 전송하는 함수
 function broadcastUserList() {
-    clients.forEach((clientObj, clientId) => {
-        if (clientObj.ws.readyState === WebSocket.OPEN) {
-            sendUserList(clientObj.ws, clientId);
-        }
-    });
+    const allUsers = votesManager.getAllUsers();
+    broadcastMessage('userList', allUsers);
 }
 
 // WebSocket 연결 핸들링
@@ -80,40 +107,70 @@ wss.on('connection', (ws, req) => {
         try {
             const parsedMessage = JSON.parse(message);
             
+            // Handle 'init' message
+            if (parsedMessage.type === 'init') {
+                const { clientId: initClientId } = parsedMessage.data;
+                if (!initClientId) {
+                    sendMessage(ws, 'error', { message: 'Invalid clientId.' });
+                    return;
+                }
+
+                // Register as Anonymous User
+                const newUser = await votesManager.addUser(initClientId, 'float', null, null, true); // Assuming 'float' is a fallback department
+                if (clients.has(initClientId)) {
+                    clients.get(initClientId).userId = newUser.userId;
+                    clients.get(initClientId).department = newUser.department;
+                } else {
+                    // In case the clientId does not exist in the map
+                    clients.set(initClientId, { ws, clientId: initClientId, userId: newUser.userId, department: newUser.department });
+                }
+
+                sendMessage(ws, 'initSuccess', newUser);
+
+                // Broadcast updated user list to all clients
+                broadcastUserList();
+                return;
+            }
+
+            // Handle 'signIn' message
             if (parsedMessage.type === 'signIn') {
                 const { department, nickname, passkey, isAnonymous } = parsedMessage.data;
                 try {
                     const newUser = await votesManager.addUser(clientId, department, nickname, passkey, isAnonymous);
-                    clients.get(clientId).userId = newUser.userId;
-                    clients.get(clientId).department = newUser.department;
+                    if (clients.has(clientId)) {
+                        clients.get(clientId).userId = newUser.userId;
+                        clients.get(clientId).department = newUser.department;
+                    }
 
-                    ws.send(JSON.stringify({ type: 'signInSuccess', data: newUser }));
+                    sendMessage(ws, 'signInSuccess', newUser);
 
-                    // 부서에 새로운 사용자 방송
-                    broadcastDepartmentMessage(department, {
-                        type: 'newUser',
-                        data: { userId: newUser.userId, nickname: newUser.nickname, department }
-                    }, clientId);
+                    // Broadcast new user to the specific department, excluding the sender
+                    broadcastMessage('newUser', { userId: newUser.userId, nickname: newUser.nickname, department }, [clientId]);
 
-                    // 모든 클라이언트에게 사용자 목록 업데이트 전송
+                    // Broadcast updated user list to all clients
                     broadcastUserList();
                 } catch (error) {
-                    ws.send(JSON.stringify({ type: 'signInFailed', message: error.message }));
+                    sendMessage(ws, 'signInFailed', { message: error.message });
                 }
             }
-            // ... 다른 메시지 타입 처리 ...
 
+            // Handle 'updateStats' message
             else if (parsedMessage.type === 'updateStats') {
-                // 예시: 사용자의 통계를 업데이트해야 할 경우
-                // 서버에서 필요한 로직을 추가하세요.
-                broadcastUserList(); // 사용자 목록 업데이트 전송
+                // Example: Update user statistics or similar
+                // Implement necessary logic here
+
+                // After updating stats, broadcast the updated user list
+                broadcastUserList();
             }
 
-            // ... 추가적인 메시지 타입 처리 ...
+            // Handle unknown message types
+            else {
+                sendMessage(ws, 'error', { message: `Unknown message type: ${parsedMessage.type}` });
+            }
 
         } catch (error) {
             console.error('Error processing message:', error);
-            ws.send(JSON.stringify({ type: 'error', message: error.message }));
+            sendMessage(ws, 'error', { message: error.message });
         }
     });
 
@@ -130,15 +187,12 @@ wss.on('connection', (ws, req) => {
                 votesManager.removeDepartment(department);
             }
 
-            // 부서에 사용자가 로그아웃했음을 방송
-            broadcastDepartmentMessage(department, {
-                type: 'userLoggedOut',
-                data: { userId, department }
-            }, clientId);
+            // 부서에 사용자가 로그아웃했음을 방송, excluding the departing client
+            broadcastMessage('userLoggedOut', { userId, department }, [clientId]);
         }
         clients.delete(clientId);
 
-        // 모든 클라이언트에게 사용자 목록 업데이트 전송
+        // Broadcast updated user list to all clients
         broadcastUserList();
     });
 });

@@ -53,7 +53,7 @@ socket.onopen = () => {
     isConnected         = true;
 
     // Send the clientId as part of the connection setup when the WebSocket first connects.
-    socket.send(JSON.stringify({ type: 'init', clientId: getToken('clientId') }));
+    socket.send(JSON.stringify({ type: 'init', data: { clientId: getToken('clientId') }}));
 
     // Start ping-pong mechanism by sending 'ping' to the server
     setInterval(() => {
@@ -77,6 +77,12 @@ socket.onclose = () => {
 // Handle WebSocket messages
 socket.onmessage = (event) => {
     const message = JSON.parse(event.data);
+    console.log('Received message:', message);
+
+    if (!message.type || !message.hasOwnProperty('data')) {
+        console.error('Malformed message received:', message);
+        return;
+    }
 
     switch(message.type) {
         case 'setUserId':
@@ -111,14 +117,14 @@ socket.onmessage = (event) => {
         case 'userLoggedOut':
             handleUserLoggedOut(message.data.userId);
             break;
-        case 'members':
-            console.log('members 메시지 수신:', updateMemberList(message.data.members));
+        case 'userList':
+            console.log('userList 메시지 수신:', updateMemberList(message.data.members));
             break;
         case 'pong':
             console.log('pong 메시지 수신:', message.message);
             break;                            
         case 'error':
-            alert(`오류: ${message.message}`);
+            console.error('Error from server:', message.data.message);
             break;
          
         default:
@@ -128,17 +134,14 @@ socket.onmessage = (event) => {
 
 // Update the member list UI
 function updateMemberList(members) {
-    const memberList = document.getElementById('membersList');
-    membersList.innerHTML = ''; // Clear existing list
-    if (members) {
-        members.forEach(member => {
-            const userItem = document.createElement('li');
-            userItem.id = `${member.userId}`;
-            userItem.textContent = `${member.nickname}`;
-            membersList.appendChild(userItem);
-        });
-    }
-    
+    const userList = document.getElementById('membersList');
+    userList.innerHTML = ''; // Clear existing list
+    members.forEach(member => {
+        const userItem = document.createElement('li');
+        userItem.id = `${member.userId}`;
+        userItem.textContent = `${member.nickname}`;
+        userList.appendChild(userItem);
+    });
 }
 
 /**
@@ -148,7 +151,7 @@ function updateMemberList(members) {
 function initializeUser(isAnonymous) {
     const clientId = generateClientId(); // 클라이언트 고유 ID 생성
     localStorage.setItem('clientId', clientId);
-    const initMessage = { type: 'init', clientId: clientId };
+    const initMessage = { type: 'init', data:{ clientId: clientId }};
     
     if (isAnonymous) {
         const department = departmentAnonInput.value.trim() || 'default';
@@ -178,7 +181,7 @@ function getToken(tokenName) {
 function attemptReconnect() {
     setTimeout(() => {
         console.log(`#${appSeq++} Attempting to reconnect...`);
-        socket = new WebSocket('wss://piljoong.kr/ws/');
+        socket = new WebSocket('wss://localhost/ws/');
     }, 5000);
 }
 /**
@@ -232,7 +235,7 @@ socket.addEventListener('message', (event) => {
  */
 function handleSetUserId(userId) {
     console.log('setUserId 메시지 수신:', userId);
-    localStorage.setItem('userId', userId);
+    storeUserId(userId);
 }
 // Function to display chat messages in the UI
 function displayChatMessage(senderId, message, timestamp) {

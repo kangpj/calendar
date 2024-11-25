@@ -18,29 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
         nicknameInput.value = storedNickname;
     }
 
-    // Event listener for the Sign-In button
-    signInBtn.addEventListener('click', () => {
-        const department = departmentInput.value.trim();
-        const nickname = nicknameInput.value.trim();
-
-        if (department === '' || nickname === '') {
-            alert('부서와 닉네임을 모두 입력해주세요.');
-            return;
-        }
-
-        const passkey = localStorage.getItem('passkey');
-        const signInData = {
-            type: 'signIn',
-            data: {
-                department: department,
-                nickname: nickname,
-                passkey: passkey || null // Send null if no passkey is stored
-            }
-        };
-
-        socket.send(JSON.stringify(signInData));
-        console.log(`Sent signIn message: ${JSON.stringify(signInData)}`);
-    });
 
     // Listen for sign-in messages from the server
     socket.addEventListener('message', (event) => {
