@@ -121,7 +121,7 @@ socket.onmessage = (event) => {
             console.log('userList 메시지 수신:', updateMemberList(message.data));
             break;
         case 'pong':
-            console.log('pong 메시지 수신:', message.message);
+            console.log('pong 메시지 수신:', message.data.message);
             break;                            
         case 'error':
             console.error('Error from server:', message.data.message);

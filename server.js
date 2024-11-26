@@ -104,15 +104,15 @@ function broadcastUserList(departmentId = 'all') {
 
 // WebSocket 연결 핸들링
 wss.on('connection', (ws, req) => {
-    const clientId = generateClientId();
-    clients.set(clientId, { ws, clientId });
-    console.log(`#${logSeq++} 클라이언트 연결: ${clientId}`);
+
+    let registeredClientId = null;
+
+    console.log(`New client connected. Awaiting initialization.`);
 
     ws.on('message', async (message) => {
         try {
             const parsedMessage = JSON.parse(message);
             
-            // Handle 'init' message
             if (parsedMessage.type === 'init') {
                 const { clientId: initClientId } = parsedMessage.data;
                 if (!initClientId) {
@@ -120,37 +120,46 @@ wss.on('connection', (ws, req) => {
                     return;
                 }
 
-                // Register as Anonymous User
-                const newUser = await votesManager.addUser(initClientId, 'float', null, null, true); // Assuming 'float' is a fallback department
                 if (clients.has(initClientId)) {
-                    clients.get(initClientId).userId = newUser.userId;
-                    clients.get(initClientId).department = newUser.department;
-                } else {
-                    // In case the clientId does not exist in the map
-                    clients.set(initClientId, { ws, clientId: initClientId, userId: newUser.userId, department: newUser.department });
+                    sendMessage(ws, 'error', { message: 'clientId already in use.' });
+                    ws.close();
+                    return;
                 }
+                // Register as Anonymous User 
+                // Assuming 'float' is a fallback department
+                const newUser = await votesManager.addUser(initClientId, 'float', null, null, true);                 
 
-                sendMessage(ws, 'initSuccess', newUser);
+                registeredClientId = initClientId;
+                clients.set(registeredClientId, { ws, clientId: registeredClientId });
+                console.log(`Client initialized with clientId: ${registeredClientId}`);
+
+                sendMessage(ws, 'initSuccess', { clientId: registeredClientId });
 
                 // Broadcast updated user list to all clients
                 broadcastUserList('float');
                 return;
             }
 
-            // Handle 'signIn' message
+            // Ensure the client has been initialized
+            if (!registeredClientId) {
+                sendMessage(ws, 'error', { message: 'Client not initialized. Please send init message first.' });
+                return;
+            }
+
+            // Handle other message types...
             if (parsedMessage.type === 'signIn') {
                 const { department, nickname, passkey, isAnonymous } = parsedMessage.data;
                 try {
-                    const newUser = await votesManager.addUser(clientId, department, nickname, passkey, isAnonymous);
-                    if (clients.has(clientId)) {
-                        clients.get(clientId).userId = newUser.userId;
-                        clients.get(clientId).department = newUser.department;
+                    const newUser = await votesManager.addUser(registeredClientId, department, nickname, passkey, isAnonymous);
+                    if (clients.has(registeredClientId)) {
+                        clients.get(registeredClientId).userId = newUser.userId;
+                        clients.get(registeredClientId).department = newUser.department;
                     }
 
                     sendMessage(ws, 'signInSuccess', newUser);
 
                     // Broadcast new user to the specific department, excluding the sender
-                    broadcastMessage('newUser', { userId: newUser.userId, nickname: newUser.nickname, department }, [clientId]);
+                    broadcastMessage('newUser', { userId: newUser.userId, nickname: newUser.nickname, department }, [registeredClientId]);
 
                     // Broadcast updated user list to all clients
                     broadcastUserList();
@@ -181,25 +190,27 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('close', () => {
-        console.log(`#${logSeq++} 클라이언트 연결 종료: ${clientId}`);
-        const userData = votesManager.getUserData(clientId);
-        if (userData) {
-            const { department, userId } = userData;
-            votesManager.removeUserFromDepartment(department, userId);
-            votesManager.removeUser(clientId);
+        if (registeredClientId) {
+            console.log(`Client disconnected: ${registeredClientId}`);
+            const userData = votesManager.getUserData(registeredClientId);
+            if (userData) {
+                const { department, userId } = userData;
+                votesManager.removeUserFromDepartment(department, userId);
+                votesManager.removeUser(registeredClientId);
 
-            // 부서에 사용자가 더 이상 없으면 부서 데이터 제거
-            if (!votesManager.hasMembers(department)) {
-                votesManager.removeDepartment(department);
+                // Remove department if empty
+                if (!votesManager.hasMembers(department)) {
+                    votesManager.removeDepartment(department);
+                }
+
+                // Broadcast user logout
+                broadcastMessage('userLoggedOut', { userId, department }, [registeredClientId]);
             }
-
-            // 부서에 사용자가 로그아웃했음을 방송, excluding the departing client
-            broadcastMessage('userLoggedOut', { userId, department }, [clientId]);
+            clients.delete(registeredClientId);
+            broadcastUserList();
+        } else {
+            console.log('A client disconnected before initialization.');
         }
-        clients.delete(clientId);
-
-        // Broadcast updated user list to all clients
-        broadcastUserList();
     });
 });
 
@@ -210,11 +221,3 @@ app.use(express.static('public'));
 server.listen(3000, () => {
     console.log('서버가 포트 3000에서 실행 중입니다.');
 });
-
-/**
- * 클라이언트 ID 생성 함수
- * @returns {string} - 생성된 클라이언트 ID
- */
-function generateClientId() {
-    return 'client_' + Math.random().toString(36).substr(2, 9);
-}
