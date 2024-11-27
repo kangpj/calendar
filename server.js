@@ -127,13 +127,13 @@ wss.on('connection', (ws, req) => {
                 }
                 // Register as Anonymous User 
                 // Assuming 'float' is a fallback department
-                const newUser = await votesManager.addUser(initClientId, 'float', null, null, true);                 
+                const userData = await votesManager.addUser(initClientId);                 
 
                 registeredClientId = initClientId;
                 clients.set(registeredClientId, { ws, clientId: registeredClientId });
                 console.log(`Client initialized with clientId: ${registeredClientId}`);
 
-                sendMessage(ws, 'initSuccess', { clientId: registeredClientId });
+                sendMessage(ws, 'initSuccess', userData);
 
                 // Broadcast updated user list to all clients
                 broadcastUserList('float');
@@ -195,13 +195,13 @@ wss.on('connection', (ws, req) => {
             const userData = votesManager.getUserData(registeredClientId);
             if (userData) {
                 const { department, userId } = userData;
-                votesManager.removeUserFromDepartment(department, userId);
-                votesManager.removeUser(registeredClientId);
+                //votesManager.removeUserFromDepartment(department, userId);
+                //votesManager.removeUser(registeredClientId);
 
                 // Remove department if empty
-                if (!votesManager.hasMembers(department)) {
-                    votesManager.removeDepartment(department);
-                }
+                //if (!votesManager.hasMembers(department)) {
+                //    votesManager.removeDepartment(department);
+                //}
 
                 // Broadcast user logout
                 broadcastMessage('userLoggedOut', { userId, department }, [registeredClientId]);

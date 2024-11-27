@@ -19,7 +19,7 @@ class VotesManager {
         this.userTypes = {
             SUPERUSER: 'superuser',
             MANAGER: 'manager',
-            NONONYMOUS: 'nononymous',
+            NONYMOUS: 'nonymous',
             ANONYMOUS: 'anonymous'
         };
         this.initializeSuperUser();
@@ -92,7 +92,7 @@ class VotesManager {
     * @param {boolean} [isAnonymous=true] - 익명 여부, default to true
     * @returns {Object} - 새로 추가된 사용자 객체
     */
-   async addUser(clientId, department, nickname = null, passkey = null, isAnonymous = true) {
+   async addUser(clientId, department = 'float', nickname = null, passkey = null, isAnonymous = true) {
         if (!isAnonymous) {
             if (!nickname || !passkey) {
                 throw new Error('닉네임과 패스키는 필수 입력 사항입니다.');
@@ -112,12 +112,12 @@ class VotesManager {
                 nickname,
                 passkey: hashedPasskey,
                 votes: [],
-                userType: this.userTypes.NONONYMOUS
+                userType: this.userTypes.NONYMOUS
             };
             this.users.set(userId, newUser);
             this.usersData.set(clientId, { userId, department, isAnonymous: false });
             this.addUserToDepartment(department, userId);
-            return newUser;
+            return this.getUserData(clientId);
         } else {
             // Handle anonymous user
             const userId = this.generateUserId();
@@ -134,7 +134,7 @@ class VotesManager {
             this.users.set(userId, newUser);
             this.usersData.set(clientId, { userId, department, isAnonymous: true });
             this.addUserToDepartment(department, userId);
-            return newUser;
+            return this.getUserData(clientId);
         }
     }
     /**
@@ -155,6 +155,24 @@ class VotesManager {
             }
         }
     }
+    /**
+     * 특정 부서에 사용자를 제거하는 함수
+     * @param {string} department - 부서 이름
+     * @param {string} userId - 제거할 사용자 ID
+     */
+    removeUserData(clientId) {
+        const user = this.users.get(userId);
+        if (user && user.department === department) {
+            this.users.delete(userId);
+            // Remove from usersData
+            for (let [clientId, userData] of this.usersData.entries()) {
+                if (userData.userId === userId && userData.department === department) {
+                    this.usersData.delete(clientId);
+                    break;
+                }
+            }
+        }
+    }    
     // Remove a user from a department
     removeUserFromDepartment(departmentId, userId) {
         const department = this.departments.get(departmentId);
