@@ -19,7 +19,7 @@ class VotesManager {
         this.userTypes = {
             SUPERUSER: 'superuser',
             MANAGER: 'manager',
-            NONYMOUS: 'nonymous',
+            ONYMOUS: 'onymous',
             ANONYMOUS: 'anonymous'
         };
         this.initializeSuperUser();
