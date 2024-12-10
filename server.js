@@ -66,10 +66,10 @@ function broadcastMessage(type, data, excludeClientIds = []) {
 // 헬퍼 함수: 사용자 로그인 상태 확인
 function isUserSignedIn(clientId) {
     const user = votesManager.getUserData(clientId);
-    return user && !user.isAnonymous;
+    return user && user.type !== votesManager.userTypes.ANONYMOUS;
 }
 
-// 사용자 목록을 특정 클라이언트에게 전송하는 함수
+// 사용자 ��록을 특정 클라이언트에게 전송하는 함수
 function sendUserList(ws, clientId) {
     const userData = votesManager.getUserData(clientId);
     if (!userData) {
@@ -77,15 +77,19 @@ function sendUserList(ws, clientId) {
         return;
     }
 
-    const targetDepartments = [userData.department, 'float']; // 자신의 부서와 기본 부서
-    const userList = votesManager.getAllUsers()
+    const targetDepartments = [userData.departmentId, 'float']; // 자신의 부서와 기본 부서
+    const allUsers = votesManager.getAllUsers();
+
+    const userList = allUsers
         .filter(user => targetDepartments.includes(user.department))
         .map(user => ({
             userId: user.userId,
-            nickname: user.nickname,
+            name: user.name,
+            phone: user.phone,
             department: user.department,
-            isManager: user.isManager,
-            isSelf: user.clientId === clientId // 클라이언트 자신인지 확인
+            userType: user.userType,
+            isManager: user.userType === votesManager.userTypes.MANAGER || user.userType === votesManager.userTypes.SUPERUSER,
+            isSelf: user.userId === userData.userId // 클라이언트 자신인지 확인
         }));
 
     sendMessage(ws, 'userList', userList);
@@ -93,13 +97,13 @@ function sendUserList(ws, clientId) {
 
 // 사용자 목록을 모든 클라이언트에게 전송하는 함수
 function broadcastUserList(departmentId = 'all') {
-    const allUsers = votesManager.getAllUsers();
-
+    let filteredUsers;
     if (departmentId === 'all') {
-        broadcastMessage('userList', allUsers);
+        filteredUsers = votesManager.getAllUsers();
     } else {
-        broadcastMessage('userList', allUsers.filter(user => user.department === departmentId));
+        filteredUsers = votesManager.getAllUsers().filter(user => user.department === departmentId);
     }
+    broadcastMessage('userList', filteredUsers);
 }
 
 // WebSocket 연결 핸들링
@@ -125,15 +129,24 @@ wss.on('connection', (ws, req) => {
                     ws.close();
                     return;
                 }
-                // Register as Anonymous User 
-                // Assuming 'float' is a fallback department
-                const userData = await votesManager.addUser(initClientId);                 
+
+                // Check if clientId already exists in usersData
+                const existingUserData = votesManager.getUserData(initClientId);
+                if (!existingUserData) {
+                    // If not, create an anonymous user and associate with clientId
+                    const anonymousUser = await votesManager.addAnonymousUser();
+                    votesManager.addUser(initClientId, anonymousUser.userId, anonymousUser.departmentId, anonymousUser.name, anonymousUser.userType);
+                }
 
                 registeredClientId = initClientId;
                 clients.set(registeredClientId, { ws, clientId: registeredClientId });
                 console.log(`Client initialized with clientId: ${registeredClientId}`);
 
+                const userData = votesManager.getUserData(registeredClientId);
                 sendMessage(ws, 'initSuccess', userData);
+
+                // Send user list to the newly connected client
+                sendUserList(ws, registeredClientId);
 
                 // Broadcast updated user list to all clients
                 broadcastUserList('float');
@@ -147,24 +160,70 @@ wss.on('connection', (ws, req) => {
             }
 
             // Handle other message types...
-            if (parsedMessage.type === 'signIn') {
-                const { department, nickname, passkey, isAnonymous } = parsedMessage.data;
+            if (parsedMessage.type === 'signUp') {
+                const { name, phone, passkey } = parsedMessage.data;
                 try {
-                    const newUser = await votesManager.addUser(registeredClientId, department, nickname, passkey, isAnonymous);
-                    if (clients.has(registeredClientId)) {
-                        clients.get(registeredClientId).userId = newUser.userId;
-                        clients.get(registeredClientId).department = newUser.department;
+                    // Prevent anonymous sign-up
+                    if (!name || !phone || !passkey) {
+                        sendMessage(ws, 'signUpFailed', { message: 'Name, phone, and passkey are required for sign-up.' });
+                        return;
                     }
 
-                    sendMessage(ws, 'signInSuccess', newUser);
+                    // Attempt to sign up the user
+                    const newUser = await votesManager.addSignUpUser(name, phone, passkey);
+                    votesManager.addUser(registeredClientId, newUser.userId, 'float', newUser.name, newUser.userType);
 
-                    // Broadcast new user to the specific department, excluding the sender
-                    broadcastMessage('newUser', { userId: newUser.userId, nickname: newUser.nickname, department }, [registeredClientId]);
+                    sendMessage(ws, 'signUpSuccess', newUser);
+
+                    // Broadcast new user to all clients in the 'float' department, excluding the sender
+                    broadcastMessage('newUser', { userId: newUser.userId, name: newUser.name, department: 'float' }, [registeredClientId]);
+
+                    // Broadcast updated user list to all clients
+                    broadcastUserList();
+                } catch (error) {
+                    sendMessage(ws, 'signUpFailed', { message: error.message });
+                }
+            }
+
+            if (parsedMessage.type === 'signIn') {
+                const { phone, passkey } = parsedMessage.data;
+                try {
+                    // If client is already signed in, prevent re-signing
+                    if (isUserSignedIn(registeredClientId)) {
+                        sendMessage(ws, 'signInFailed', { message: '이미 로그인 상태입니다.' });
+                        return;
+                    }
+
+                    // Perform authentication for non-anonymous users
+                    const userData = await votesManager.loginUser(registeredClientId, phone, passkey);
+                    sendMessage(ws, 'signInSuccess', userData);
 
                     // Broadcast updated user list to all clients
                     broadcastUserList();
                 } catch (error) {
                     sendMessage(ws, 'signInFailed', { message: error.message });
+                }
+            }
+
+            // Handle 'updateVote' message
+            else if (parsedMessage.type === 'updateVote') {
+                const { departmentId, date } = parsedMessage.data;
+                const userData = votesManager.getUserData(registeredClientId);
+                if (!userData) {
+                    sendMessage(ws, 'error', { message: '사용자 데이터가 없습니다.' });
+                    return;
+                }
+
+                try {
+                    votesManager.updateVote(departmentId, date, userData.userId);
+                    sendMessage(ws, 'voteUpdated', { departmentId, date });
+
+                    // Optionally, broadcast updated vote stats
+                    // For example:
+                    const allVotes = votesManager.getAllVotes(departmentId, userData.userId);
+                    broadcastMessage('votesUpdated', { departmentId, votes: allVotes }, [registeredClientId]);
+                } catch (error) {
+                    sendMessage(ws, 'error', { message: error.message });
                 }
             }
 
@@ -194,17 +253,11 @@ wss.on('connection', (ws, req) => {
             console.log(`Client disconnected: ${registeredClientId}`);
             const userData = votesManager.getUserData(registeredClientId);
             if (userData) {
-                const { department, userId } = userData;
-                //votesManager.removeUserFromDepartment(department, userId);
-                //votesManager.removeUser(registeredClientId);
-
-                // Remove department if empty
-                //if (!votesManager.hasMembers(department)) {
-                //    votesManager.removeDepartment(department);
-                //}
+                const { departmentId, userId } = userData;
+                votesManager.removeUser(userId);
 
                 // Broadcast user logout
-                broadcastMessage('userLoggedOut', { userId, department }, [registeredClientId]);
+                broadcastMessage('userLoggedOut', { userId, departmentId }, [registeredClientId]);
             }
             clients.delete(registeredClientId);
             broadcastUserList();

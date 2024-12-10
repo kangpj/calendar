@@ -1,19 +1,16 @@
 // votesManager.js
 
-// Using a Map to store departments for efficient key-based management
-//const departments = new Map();
 const bcrypt = require('bcrypt');
-// 사용자 데이터가 서버에서 관리되므로, 서버에서 관리하는 usersData와 연동 필요
-//const users = new Map();
-//const usersData = new Map(); // 서버에서 클라이언트와 연동되는 사용자 데이터를 관리
+const crypto = require('crypto');
 
 class VotesManager {
     constructor() {
-        // Initialize a Map to store department data
+        // Initialize Maps to store users and departments
         this.userIdCounter = 1;
-        this.users = new Map();
-        this.usersData = new Map();
-        this.departments = new Map();
+        this.users = new Map();        // Stores user details
+        this.usersData = new Map();    // Associates clientId with user data
+        this.departments = new Map();  // Stores department details
+
         this.defaultDepartmentId = "float";
         this.initializeDepartment(this.defaultDepartmentId);
         this.userTypes = {
@@ -28,19 +25,38 @@ class VotesManager {
     initializeSuperUser() {
         const superUser = {
             userId: 'superuser_1',
-            department: 'All',
-            nickname: 'superadmin',
+            name: 'Super Admin',
+            phone: '000-0000',
             passkey: null,
-            votes: [],
+            token: null,
+            expiration: null,
             userType: this.userTypes.SUPERUSER
         };
         this.users.set(superUser.userId, superUser);
-        this.usersData.set(superUser.userId, { userId: superUser.userId, department: superUser.department, isAnonymous: false });
+        this.usersData.set('superclient', { 
+            clientId: 'superclient',
+            userId: superUser.userId, 
+            departmentId: 'All', 
+            nickname: 'superadmin', 
+            type: this.userTypes.SUPERUSER 
+        });
     }
     
-    // 간단한 userId 생성 함수
+    // Helper method to generate unique user IDs
     generateUserId() {
-       return `user_${this.userIdCounter++}`;
+        return `user_${this.userIdCounter++}`;
+    }
+
+    // Helper method to generate tokens
+    generateToken() {
+        return crypto.randomBytes(16).toString('hex');
+    }
+
+    // Helper method to calculate token expiration
+    calculateExpiration(hours = 1) {
+        const now = new Date();
+        now.setHours(now.getHours() + hours);
+        return now.toISOString();
     }
 
     // Initialize a department with default structure
@@ -55,412 +71,167 @@ class VotesManager {
         }
     }
 
-    // Create or retrieve votes data for a department
-    getDepartmentVotes(departmentId) {
+    // Add a user to a department
+    addUserToDepartment(departmentId, userId) {
         this.initializeDepartment(departmentId);
-        return this.departments.get(departmentId).votesData;
-    }
-
-    // Assign the first member as the owner of the department
-    assignOwner(departmentId, userId) {
         const department = this.departments.get(departmentId);
+        department.members.add(userId);
+        console.log(`User ${userId} added to department ${departmentId}.`);
+        // Assign owner if none exists
         if (!department.owner) {
             department.owner = userId;
             console.log(`User ${userId} assigned as owner of department ${departmentId}.`);
         }
     }
 
-    // Check if a user is the department owner
-    isOwner(departmentId, userId) {
-        const department = this.departments.get(departmentId);
-        return department && department.owner === userId;
-    }
-
-    // Add a user to a department
-    addUserToDepartment(departmentId, userId) {
-        this.initializeDepartment(departmentId);
-        const department = this.departments.get(departmentId);
-        department.members.add(userId);
-        console.log(`User ${userId} added to department ${departmentId}.`, this.departments);
-    }
-   /**
-    * 사용자 추가 함수
-    * @param {string} clientId - 클라이언트 ID
-    * @param {string} department - 부서 이름
-    * @param {string} [nickname] - 닉네임 (익명 사용 시 생략)
-    * @param {string} [passkey] - 패스키 (익명 사용 시 생략)
-    * @param {boolean} [isAnonymous=true] - 익명 여부, default to true
-    * @returns {Object} - 새로 추가된 사용자 객체
-    */
-   async addUser(clientId, department = 'float', nickname = null, passkey = null, isAnonymous = true) {
-        if (!isAnonymous) {
-            if (!nickname || !passkey) {
-                throw new Error('닉네임과 패스키는 필수 입력 사항입니다.');
-            }
-
-            const isTaken = this.isNicknameTaken(department, nickname);
-        
-            if (isTaken) {
-                throw new Error('닉네임이 이미 사용 중입니다.');
-            }
-            
-            const hashedPasskey = await bcrypt.hash(passkey, 10);
-            const userId = this.generateUserId();
-            const newUser = {
-                userId,
-                department,
-                nickname,
-                passkey: hashedPasskey,
-                votes: [],
-                userType: this.userTypes.NONYMOUS
-            };
-            this.users.set(userId, newUser);
-            this.usersData.set(clientId, { userId, department, isAnonymous: false });
-            this.addUserToDepartment(department, userId);
-            return this.getUserData(clientId);
-        } else {
-            // Handle anonymous user
-            const userId = this.generateUserId();
-            const anonymousNickname = `Guest_${Math.floor(Math.random() * 10000)}`; // Generate a random nickname for display
-            
-            const newUser = {
-                userId,
-                department,
-                nickname: anonymousNickname,
-                passkey: null, // No passkey for anonymous users
-                votes: [],
-                userType: this.userTypes.ANONYMOUS
-            };
-            this.users.set(userId, newUser);
-            this.usersData.set(clientId, { userId, department, isAnonymous: true });
-            this.addUserToDepartment(department, userId);
-            return this.getUserData(clientId);
-        }
-    }
     /**
-     * 특정 부서에 사용자를 제거하는 함수
-     * @param {string} department - 부서 이름
-     * @param {string} userId - 제거할 사용자 ID
+     * Revised addUser function to set only the usersData Map.
+     * Ensures that anonymous users are always assigned to the 'float' department.
+     * 
+     * @param {string} clientId - The client ID.
+     * @param {string} userId - The user ID to associate with the clientId.
+     * @param {string} departmentId - The department ID the user belongs to.
+     * @param {string} nickname - The user's nickname.
+     * @param {string} type - The type of user (e.g., 'superuser', 'manager', 'onymous', 'anonymous').
+     * @returns {Object} - The user data associated with the clientId.
+     * @throws {Error} - If department assignment for anonymous user is incorrect.
      */
-    removeUserFromUsers(department, userId) {
-        const user = this.users.get(userId);
-        if (user && user.department === department) {
-            this.users.delete(userId);
-            // Remove from usersData
-            for (let [clientId, userData] of this.usersData.entries()) {
-                if (userData.userId === userId && userData.department === department) {
-                    this.usersData.delete(clientId);
-                    break;
-                }
-            }
+    addUser(clientId, userId, departmentId, nickname, type) {
+        if (!clientId || !userId || !departmentId || !nickname || !type) {
+            throw new Error('All parameters must be provided to add a user.');
         }
+
+        const user = this.users.get(userId);
+        if (!user) {
+            throw new Error(`User ID '${userId}' does not exist.`);
+        }
+
+        // Enforce 'float' department for anonymous users
+        if (type === this.userTypes.ANONYMOUS && departmentId !== this.defaultDepartmentId) {
+            throw new Error('Anonymous users must be assigned to the "float" department.');
+        }
+
+        this.usersData.set(clientId, { clientId, userId, departmentId, nickname, type });
+        console.log(`Client ${clientId} associated with user ${userId} in department ${departmentId}.`);
+        return this.getUserData(clientId);
     }
+
     /**
-     * 특정 부서에 사용자를 제거하는 함수
-     * @param {string} department - 부서 이름
-     * @param {string} userId - 제거할 사용자 ID
+     * Adds a new user to the users Map.
+     * Sign-up users cannot be anonymous.
+     * 
+     * @param {string} name - The user's full name.
+     * @param {string} phone - The user's phone number.
+     * @param {string} [passkey=null] - The user's passkey (required for non-anonymous users).
+     * @returns {Object} - The newly added user object.
+     * @throws {Error} - If required fields are missing or phone is taken.
      */
-    removeUserData(clientId) {
-        const user = this.users.get(userId);
-        if (user && user.department === department) {
-            this.users.delete(userId);
-            // Remove from usersData
-            for (let [clientId, userData] of this.usersData.entries()) {
-                if (userData.userId === userId && userData.department === department) {
-                    this.usersData.delete(clientId);
-                    break;
-                }
-            }
+    async addSignUpUser(name, phone, passkey = null) {
+        // Sign-up users must be non-anonymous
+        if (!name || !phone || !passkey) {
+            throw new Error('Name, phone, and passkey are required for sign-up.');
         }
-    }    
-    // Remove a user from a department
-    removeUserFromDepartment(departmentId, userId) {
-        const department = this.departments.get(departmentId);
-        if (department) {
-            department.members.delete(userId);
-            console.log(`User ${userId} removed from department ${departmentId}.`);
-            // If the owner leaves, reset the department owner
-            if (department.owner === userId) {
-                department.owner = null;
-                // Optionally, assign a new owner if members exist
-                if (department.members.size > 0) {
-                    department.owner = department.members.values().next().value;
-                    console.log(`User ${department.owner} is now the owner of department ${departmentId}.`);
-                }
-            }
-        }
-    }
 
-    // Update a vote for a specific date (or cell) in the department
-    updateVote(departmentId, date, userId) {
-        const votesData = this.getDepartmentVotes(departmentId);
-        if (!votesData[date]) {
-            votesData[date] = new Set();
-        }
-        votesData[date].add(userId);
-        console.log(`User ${userId} voted on ${date} in department ${departmentId}.`);
-    }
+        const isTaken = this.isPhoneTaken(phone);
 
-    // Remove a vote for a specific date by a specific user
-    removeVote(departmentId, date, userId) {
-        const votesData = this.getDepartmentVotes(departmentId);
-        if (votesData[date]) {
-            votesData[date].delete(userId);
-            console.log(`User ${userId} removed vote on ${date} in department ${departmentId}.`);
-            // Remove date entry if no votes left
-            if (votesData[date].size === 0) {
-                delete votesData[date];
-            }
-        }
-    }
-
-    // Get all votes in a department (convert Set to array for JSON compatibility)
-    getAllVotes(departmentId, year, month) {
-        const votesData = this.getDepartmentVotes(departmentId);
-        const filteredData = {};
-        
-        // year와 month가 제공된 경우에만 필터링
-        if (year !== undefined && month !== undefined) {
-            const prefix = `${year}-${month}`;
-            for (const [date, votes] of Object.entries(votesData)) {
-                if (date.startsWith(prefix)) {
-                    filteredData[date] = Array.from(votes);
-                }
-            }
-            return filteredData;
+        if (isTaken) {
+            throw new Error('Phone number is already in use.');
         }
         
-        // year와 month가 없으면 전체 데이터 반환
-        return Object.fromEntries(
-            Object.entries(votesData).map(([date, votes]) => [date, Array.from(votes)])
-        );
+        const hashedPasskey = await bcrypt.hash(passkey, 10);
+        const userId = this.generateUserId();
+        const token = this.generateToken();
+        const expiration = this.calculateExpiration();
+
+        const newUser = {
+            userId,
+            name,
+            phone,
+            passkey: hashedPasskey,
+            token,
+            expiration,
+            userType: this.userTypes.ONYMOUS
+        };
+        this.users.set(userId, newUser);
+        this.addUserToDepartment('float', userId); // Default department; can be modified as needed
+        console.log(`New user ${userId} added as 'onymous' to department 'float'.`);
+        return newUser;
     }
 
-    // Reset votes data for a department (only by owner)
-    resetVotes(departmentId, userId) {
-        if (this.isOwner(departmentId, userId)) {
-            this.departments.get(departmentId).votesData = {};
-            return true;
-        }
-        return false;
+    /**
+     * Creates an anonymous user and associates with a clientId.
+     * Anonymous users are always part of the 'float' department.
+     * 
+     * @returns {Object} - The newly added anonymous user object.
+     */
+    async addAnonymousUser() {
+        const userId = this.generateUserId();
+        const anonymousName = `Guest_${Math.floor(Math.random() * 10000)}`; // Generate a random name for display
+        const token = this.generateToken();
+        const expiration = this.calculateExpiration();
+
+        const newUser = {
+            userId,
+            name: anonymousName,
+            phone: null, // No phone for anonymous users
+            passkey: null, // No passkey for anonymous users
+            token,
+            expiration,
+            userType: this.userTypes.ANONYMOUS
+        };
+        this.users.set(userId, newUser);
+        this.addUserToDepartment(this.defaultDepartmentId, userId);
+        console.log(`Anonymous user ${userId} added to department '${this.defaultDepartmentId}'.`);
+        return newUser;
     }
 
-    // Retrieve a list of all members in a department
-    getDepartmentMembers(departmentId) {
-        const department = this.departments.get(departmentId);
-        return department ? Array.from(department.members) : [];
-    }
-
-    // Handle messaging between members of a department
-    sendMessage(departmentId, senderId, recipientIds, message) {
-        const department = this.departments.get(departmentId);
-        if (!department) return [];
-
-        // Filter members based on recipients, exclude the sender
-        const members = Array.from(department.members);
-        return members
-            .filter((userId) => recipientIds.includes(userId) && userId !== senderId)
-            .map((userId) => ({ userId, message }));
-    }
-
-    // Function to create or retrieve the default department (for unassigned users)
-    getDefaultDepartment() {
-        return this.getDepartmentVotes(this.defaultDepartmentId);
-    }
-
-    // Toggle a vote for a specific date by a user in a department
-    toggleVote(departmentId, year, month, day, userId) {
-        const dateKey = `${year}-${month}-${day}`;
-        const department = this.departments.get(departmentId);
-        if (!department) {
-            console.error(`Department ${departmentId} does not exist.`);
-            return;
-        }
-
-        if (!department.votesData[dateKey]) {
-            department.votesData[dateKey] = new Set();
-        }
-
-        if (department.votesData[dateKey].has(userId)) {
-            department.votesData[dateKey].delete(userId);
-            console.log(`User ${userId} removed vote on ${dateKey} in department ${departmentId}.`);
-            // Optionally, remove the date key if no votes remain
-            if (department.votesData[dateKey].size === 0) {
-                delete department.votesData[dateKey];
-            }
-        } else {
-            department.votesData[dateKey].add(userId);
-            console.log(`User ${userId} added vote on ${dateKey} in department ${departmentId}.`);
-        }
-    }
-
-    // Check if the user is the first member in the department
-    isFirstUserInDepartment(departmentId) {
-        const department = this.departments.get(departmentId);
-        if (!department) {
-            console.error(`Department ${departmentId} does not exist.`);
-            return false;
-        }
-        return department.members.size === 0;
-    }
-
-    // Assign a manager to the department
-    assignDepartmentManager(departmentId, userId) {
-        const department = this.departments.get(departmentId);
-        if (!department) {
-            console.error(`Department ${departmentId} does not exist.`);
-            return;
-        }
-        department.owner = userId;
-        console.log(`User ${userId} has been assigned as manager of department ${departmentId}.`);
-    }
-
-    // Clear all votes in a department (only by manager)
-    clearAllVotes(departmentId) {
-        const department = this.departments.get(departmentId);
-        if (!department) {
-            console.error(`Department ${departmentId} does not exist.`);
-            return false;
-        }
-        department.votesData = {};
-        console.log(`All votes cleared in department ${departmentId}.`);
-        return true;
-    }
-
-
-       /**
-    * 특정 부서 내에서 닉네임이 이미 사용 중인지 확인하고, 알파벳 문자만 포함하는지 검증
-    * @param {string} department - 현재 부서 이름
-    * @param {string} nickname - 입력된 닉네임
-    * @returns {boolean} - true if taken, false otherwise
-    */
-    isNicknameTaken(department, nickname) {
-        const lowerNickname = nickname.toLowerCase();
+    // Helper method to check if a phone number is already taken
+    isPhoneTaken(phone) {
         for (let user of this.users.values()) {
-            if (user.department === department && user.nickname.toLowerCase() === lowerNickname) {
+            if (user.phone === phone) {
                 return true;
             }
         }
         return false;
     }
 
-    // Check if a department has members
-    hasMembers(departmentId) {
-        const department = this.departments.get(departmentId);
-        return department && department.members.size > 0;
-    }
-
-    // Remove a department
-    removeDepartment(departmentId) {
-        if (this.departments.has(departmentId)) {
-            this.departments.delete(departmentId);
-            console.log(`Department ${departmentId} has been removed as it has no members.`);
-        }
-    }
-
-    // Get all members of a department
-    getDepartmentMembers(departmentId) {
-        const department = this.departments.get(departmentId);
-        return department ? Array.from(department.members) : [];
-    }
-
     /**
-     * 특정 클라이언트 ID로 사용자 정보를 조회하는 함수
-     * @param {string} clientId - 조회할 클라이언트 ID
-     * @returns {Object|null} - 사용자 정보 객체 또는 존재하지 않을 경우 null
-     */
-    getUserData(clientId) {
-        if (!clientId) {
-            console.warn('getUser 호출 시 clientId가 제공되지 않았습니다.');
-            return null;
-        }
-
-        const userData = this.usersData.get(clientId);
-
-        if (!userData) {
-            console.warn(`클라이언트 ID '${clientId}'에 해당하는 사용자를 찾을 수 없습니다.`);
-            return null;
-        }
-   
-        return userData;
-    }
-
-    /**
-     * 특정 사용자 ID로 사용자 정보를 조회하는 함수
-     * @param {string} userId - 조회할 사용자 ID
-     * @returns {Object|null} - 사용자 정보 객체 또는 존재하지 않을 경우 null
-     */
-    getUser(userId) {
-        if (!userId) {
-            console.warn('getUser 호출 시 userId가 제공되지 않았습니다.');
-            return null;
-        }
-
-        const user = this.users.get(userId);
-
-        if (!user) {
-            console.warn(`사용자 ID '${userId}'에 해당하는 사용자를 찾을 수 없습니다.`);
-            return null;
-        }
-
-        // 필요한 경우 사용자 정보에서 민감한 데이터를 제외하고 반환
-        const { passkey, ...safeUserData } = user;
-        return safeUserData;
-    }
-
-    /**
-     * 특정 클라이언트 ID로 사용자 정보를 조회하는 함수
-     * @param {string} clientId - 조회할 클라이언트 ID
-     * @returns {Object|null} - 사용자 정보 객체 또는 존재하지 않을 경우 null
-     */
-    getUserByClientId(clientId) {
-        if (!clientId) {
-            console.warn('getUserByClientId 호출 시 clientId가 제공되지 않았습니다.');
-            return null;
-        }
-
-        const userData = this.usersData.get(clientId);
-
-        if (!userData) {
-            console.warn(`클라이언트 ID '${clientId}'에 해당하는 사용자를 찾을 수 없습니다.`);
-            return null;
-        }
-
-        const user = this.users.get(userData.userId);
-
-        if (!user) {
-            console.warn(`사용자 ID '${userData.userId}'에 해당하는 사용자를 찾을 수 없습니다.`);
-            return null;
-        }
-
-        // 민감한 정보 제외
-        const { passkey, ...safeUserData } = user;
-        return {
-            ...safeUserData,
-            clientId: clientId,
-            isAnonymous: userData.isAnonymous
-        };
-    }
-
-    /**
-     * 매니저로 승격시키는 함수
-     * @param {string} userId - 매니저로 승격할 사용자 ID
-     * @param {string} passkey - 매니저 인증을 위한 패스키
-     * @returns {boolean} - 성공 여부
+     * Promote a user to manager.
+     * 
+     * @param {string} userId - The user ID to promote.
+     * @param {string} passkey - The user's passkey for verification.
+     * @returns {boolean} - Returns true if promotion is successful.
+     * @throws {Error} - If user does not exist, is already a manager/superuser, or passkey is invalid.
      */
     async promoteToManager(userId, passkey) {
         const user = this.users.get(userId);
         if (!user) {
-            throw new Error('사용자를 찾을 수 없습니다.');
+            throw new Error('User not found.');
         }
 
-        if (user.userType !== this.userTypes.NONONYMOUS) {
-            throw new Error('매니저로 승격할 수 없는 사용자 유형입니다.');
+        if (user.userType === this.userTypes.SUPERUSER) {
+            throw new Error('User is already a superuser.');
+        }
+
+        if (user.userType === this.userTypes.MANAGER) {
+            throw new Error('User is already a manager.');
+        }
+
+        if (user.userType === this.userTypes.ANONYMOUS) {
+            throw new Error('Anonymous users cannot be promoted.');
+        }
+
+        if (user.userType !== this.userTypes.ONYMOUS) {
+            throw new Error('Only onymous users can be promoted to manager.');
+        }
+
+        if (!user.passkey) {
+            throw new Error('User does not have a passkey set.');
         }
 
         const isPasskeyValid = await bcrypt.compare(passkey, user.passkey);
         if (!isPasskeyValid) {
-            throw new Error('패스키가 올바르지 않습니다.');
+            throw new Error('Invalid passkey.');
         }
 
         user.userType = this.userTypes.MANAGER;
@@ -470,279 +241,193 @@ class VotesManager {
     }
 
     /**
-     * 사용자 로그인 함수
-     * @param {string} clientId - 클라이언트 ID
-     * @param {string} department - 부서 이름
-     * @param {string} nickname - 닉네임
-     * @returns {Object} - 로그인된 사용자 객체
+     * Demote a manager to onymous.
+     * 
+     * @param {string} userId - The user ID to demote.
+     * @returns {boolean} - Returns true if demotion is successful.
+     * @throws {Error} - If user does not exist or is not a manager.
      */
-    loginUser(clientId, department, nickname) {
-        // Find user by department and nickname
-        for (let user of this.users.values()) {
-            if (user.department === department && user.nickname === nickname && user.userType !== this.userTypes.ANONYMOUS) {
-                // Update usersData to reflect non-anonymous status
-                this.usersData.set(clientId, { userId: user.userId, department, isAnonymous: false });
-                console.log(`User ${user.userId} has logged in successfully.`);
-                return user;
-            }
+    demoteManager(userId) {
+        const user = this.users.get(userId);
+        if (!user) {
+            throw new Error('User not found.');
         }
-        throw new Error('Invalid department or nickname.');
+
+        if (user.userType !== this.userTypes.MANAGER) {
+            throw new Error('User is not a manager.');
+        }
+
+        user.userType = this.userTypes.ONYMOUS;
+        this.users.set(userId, user);
+        console.log(`User ${userId} has been demoted to onymous.`);
+        return true;
     }
 
     /**
-     * 사용자 삭제 함수
-     * @param {string} userId - 삭제할 사용자 ID
+     * Promote a user to superuser.
+     * 
+     * @param {string} userId - The user ID to promote.
+     * @param {string} passkey - The user's passkey for verification.
+     * @returns {boolean} - Returns true if promotion is successful.
+     * @throws {Error} - If user does not exist, is already a superuser, or passkey is invalid.
+     */
+    async promoteToSuperUser(userId, passkey) {
+        const user = this.users.get(userId);
+        if (!user) {
+            throw new Error('User not found.');
+        }
+
+        if (user.userType === this.userTypes.SUPERUSER) {
+            throw new Error('User is already a superuser.');
+        }
+
+        if (user.userType !== this.userTypes.MANAGER) {
+            throw new Error('Only managers can be promoted to superusers.');
+        }
+
+        if (!user.passkey) {
+            throw new Error('User does not have a passkey set.');
+        }
+
+        const isPasskeyValid = await bcrypt.compare(passkey, user.passkey);
+        if (!isPasskeyValid) {
+            throw new Error('Invalid passkey.');
+        }
+
+        user.userType = this.userTypes.SUPERUSER;
+        this.users.set(userId, user);
+        console.log(`User ${userId} has been promoted to superuser.`);
+        return true;
+    }
+
+    /**
+     * Get user data associated with a clientId.
+     * 
+     * @param {string} clientId - The client ID.
+     * @returns {Object|null} - The user data or null if not found.
+     */
+    getUserData(clientId) {
+        return this.usersData.get(clientId) || null;
+    }
+
+    /**
+     * Retrieve votes data for a specific department.
+     * 
+     * @param {string} departmentId - The department ID.
+     * @returns {Object} - Votes data for the department.
+     */
+    getAllVotes(departmentId, requestingUserId) {
+        const department = this.departments.get(departmentId);
+        if (!department) {
+            throw new Error(`Department '${departmentId}' does not exist.`);
+        }
+        // Implement role-based access if needed
+        return department.votesData;
+    }
+
+    /**
+     * Update vote for a specific date in a department.
+     * 
+     * @param {string} departmentId - The department ID.
+     * @param {string} date - The date for which the vote is cast.
+     * @param {string} userId - The user ID casting the vote.
+     */
+    updateVote(departmentId, date, userId) {
+        const department = this.departments.get(departmentId);
+        if (!department) {
+            throw new Error(`Department '${departmentId}' does not exist.`);
+        }
+
+        if (!department.votesData[date]) {
+            department.votesData[date] = new Set();
+        }
+
+        department.votesData[date].add(userId);
+        console.log(`User ${userId} cast a vote for ${date} in department ${departmentId}.`);
+    }
+
+    /**
+     * Get all users in the system.
+     * 
+     * @returns {Array<Object>} - List of all user objects.
+     */
+    getAllUsers() {
+        return Array.from(this.users.values()).map(user => ({
+            userId: user.userId,
+            name: user.name,
+            phone: user.phone,
+            department: this.getUserDepartment(user.userId),
+            userType: user.userType
+        }));
+    }
+
+    /**
+     * Get the department ID of a user.
+     * 
+     * @param {string} userId - The user ID.
+     * @returns {string|null} - The department ID or null if not found.
+     */
+    getUserDepartment(userId) {
+        for (let [deptId, dept] of this.departments.entries()) {
+            if (dept.members.has(userId)) {
+                return deptId;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Remove a user from the system.
+     * 
+     * @param {string} userId - The user ID to remove.
+     * @throws {Error} - If user does not exist.
      */
     removeUser(userId) {
         const user = this.users.get(userId);
         if (!user) {
-            throw new Error('사용자를 찾을 수 없습니다.');
+            throw new Error('User not found.');
         }
 
-        // Remove the user from their department's members
-        const department = this.departments.get(user.department);
-        if (department) {
-            department.members.delete(userId);
-            console.log(`User ${userId} removed from department ${user.department}.`);
+        // Remove from departments
+        const departmentId = this.getUserDepartment(userId);
+        if (departmentId) {
+            const department = this.departments.get(departmentId);
+            if (department) {
+                department.members.delete(userId);
+                console.log(`User ${userId} removed from department ${departmentId}.`);
 
-            // If the user was the owner, reassign owner or null
-            if (department.owner === userId) {
-                if (department.members.size > 0) {
-                    // Assign a new owner, e.g., first member
-                    const newOwnerId = department.members.values().next().value;
-                    department.owner = newOwnerId;
-                    const newOwner = this.users.get(newOwnerId);
-                    if (newOwner) {
-                        // Assuming passkey exists for non-anonymous users
-                        if (newOwner.passkey) {
-                            this.promoteToManager(newOwnerId, newOwner.passkey).catch(err => {
-                                console.error(`Failed to promote new owner ${newOwnerId}:`, err);
-                            });
+                // Reassign owner if necessary
+                if (department.owner === userId) {
+                    if (department.members.size > 0) {
+                        department.owner = department.members.values().next().value;
+                        console.log(`User ${department.owner} is now the owner of department ${departmentId}.`);
+                    } else {
+                        department.owner = null;
+                        console.log(`Department ${departmentId} now has no owner.`);
+                        if (departmentId !== this.defaultDepartmentId) {
+                            this.departments.delete(departmentId);
+                            console.log(`Department ${departmentId} has been removed due to no members.`);
                         }
-                        console.log(`New owner of department ${user.department} is ${newOwnerId}.`);
                     }
-                } else {
-                    department.owner = null;
-                    console.log(`Department ${user.department} has no more owners.`);
                 }
             }
-
-            // If department has no more members, remove it (except default)
-            if (department.members.size === 0 && user.department !== this.defaultDepartmentId) {
-                this.departments.delete(user.department);
-                console.log(`Department ${user.department} removed as it has no more members.`);
-            }
         }
 
-        // Remove the user from usersData
+        // Remove from usersData
         for (let [clientId, data] of this.usersData.entries()) {
             if (data.userId === userId) {
                 this.usersData.delete(clientId);
-                console.log(`Client ${clientId} removed from usersData.`);
+                console.log(`Client ${clientId} association removed.`);
                 break;
             }
         }
 
         // Finally, remove the user
         this.users.delete(userId);
-        console.log(`User ${userId} deleted from users.`);
+        console.log(`User ${userId} has been removed from the system.`);
     }
 
-    /**
-     * 패스키 검증 함수
-     * @param {string} userId - 사용자 ID
-     * @param {string} passkey - 제공된 패스키
-     * @returns {boolean} - 패스키 검증 결과
-     */
-    async verifyPasskey(userId, passkey) {
-        const user = this.users.get(userId);
-        if (!user || !user.passkey) {
-            return false;
-        }
-        return await bcrypt.compare(passkey, user.passkey);
-    }
-
-    /**
-     * 사용자 부서 및 닉네임 업데이트 함수
-     * @param {string} userId - 사용자 ID
-     * @param {string} newDepartment - 새로운 부서
-     * @param {string} newNickname - 새로운 닉네임
-     */
-    async updateUserDepartment(userId, newDepartment, newNickname) {
-        const user = this.users.get(userId);
-        if (!user) {
-            throw new Error('사용자를 찾을 수 없습니다.');
-        }
-
-        // Check if nickname is taken in the new department
-        if (this.isNicknameTaken(newDepartment, newNickname)) {
-            throw new Error('닉네임이 이미 사용 중입니다.');
-        }
-
-        // Remove user from current department
-        const currentDepartment = this.departments.get(user.department);
-        if (currentDepartment) {
-            currentDepartment.members.delete(userId);
-            console.log(`User ${userId} removed from department ${user.department}.`);
-
-            // If the user was the owner, reassign owner or null
-            if (currentDepartment.owner === userId) {
-                if (currentDepartment.members.size > 0) {
-                    const newOwnerId = currentDepartment.members.values().next().value;
-                    currentDepartment.owner = newOwnerId;
-                    const newOwner = this.users.get(newOwnerId);
-                    if (newOwner) {
-                        if (newOwner.passkey) {
-                            await this.promoteToManager(newOwnerId, newOwner.passkey).catch(err => {
-                                console.error(`Failed to promote new owner ${newOwnerId}:`, err);
-                            });
-                        }
-                        console.log(`New owner of department ${currentDepartment.department} is ${newOwnerId}.`);
-                    }
-                } else {
-                    currentDepartment.owner = null;
-                    console.log(`Department ${user.department} has no more owners.`);
-                }
-            }
-
-            // If department has no more members, remove it (except default)
-            if (currentDepartment.members.size === 0 && user.department !== this.defaultDepartmentId) {
-                this.departments.delete(user.department);
-                console.log(`Department ${user.department} removed as it has no more members.`);
-            }
-        }
-
-        // Update user's department and nickname
-        user.department = newDepartment;
-        user.nickname = newNickname;
-        this.users.set(userId, user);
-        console.log(`User ${userId} updated to department ${newDepartment} with nickname ${newNickname}.`);
-
-        // Add user to new department
-        this.addUserToDepartment(newDepartment, userId);
-    }
-
-    /**
-     * 부서 내 첫 번째 사용자 확인 함수
-     * @param {string} departmentId - 부서 ID
-     * @returns {boolean} - 첫 번째 사용자 여부
-     */
-    isFirstUserInDepartment(departmentId) {
-        const department = this.departments.get(departmentId);
-        if (!department) {
-            return false;
-        }
-        return department.members.size === 1;
-    }
-
-    /**
-     * 부서의 모든 투표 데이터를 초기화하는 함수
-     * @param {string} departmentId - 부서 ID
-     */
-    clearAllVotes(departmentId) {
-        const department = this.departments.get(departmentId);
-        if (department) {
-            department.votesData = {};
-            console.log(`All votes cleared for department ${departmentId}.`);
-        } else {
-            throw new Error('부서를 찾을 수 없습니다.');
-        }
-    }
-
-    /**
-     * 부서의 모든 투표 데이터를 가져오는 함수
-     * @param {string} departmentId - 부서 ID
-     * @param {number} [year] - 연도
-     * @param {number} [month] - 월
-     * @returns {Object} - 특정 부서의 투표 데이터
-     */
-    getAllVotes(departmentId, year, month) {
-        const department = this.departments.get(departmentId);
-        if (!department) {
-            throw new Error('부서를 찾을 수 없습니다.');
-        }
-
-        if (year && month) {
-            return department.votesData[`${year}-${month}`] || {};
-        }
-        return department.votesData;
-    }
-
-    /**
-     * 부서의 모든 구성원을 가져오는 함수
-     * @param {string} departmentId - 부서 ID
-     * @returns {Array} - 사용자 리스트
-     */
-    getDepartmentMembers(departmentId) {
-        const department = this.departments.get(departmentId);
-        if (!department) {
-            return [];
-        }
-        return Array.from(department.members).map(userId => this.users.get(userId));
-    }
-
-    /**
-     * 특정 날짜에 대한 투표를 토글하는 함수
-     * @param {string} departmentId - 부서 ID
-     * @param {number} year - 연도
-     * @param {number} month - 월
-     * @param {number} day - 일
-     * @param {string} userId - 사용자 ID
-     */
-    toggleVote(departmentId, year, month, day, userId) {
-        const department = this.departments.get(departmentId);
-        if (!department) {
-            throw new Error('부서를 찾을 수 없습니다.');
-        }
-
-        const dateKey = `${year}-${month}-${day}`;
-        if (!department.votesData[dateKey]) {
-            department.votesData[dateKey] = new Set();
-        }
-
-        if (department.votesData[dateKey].has(userId)) {
-            department.votesData[dateKey].delete(userId);
-            console.log(`User ${userId} removed vote on ${dateKey} in department ${departmentId}.`);
-        } else {
-            department.votesData[dateKey].add(userId);
-            console.log(`User ${userId} added vote on ${dateKey} in department ${departmentId}.`);
-        }
-
-        // Convert Set to Array for storage
-        department.votesData[dateKey] = Array.from(department.votesData[dateKey]);
-    }
-
-    /**
-     * 특정 부서와 기간에 해당하는 투표 데이터를 가져오는 함수
-     * @param {string} departmentId - 부서 ID
-     * @param {number} year - 연도
-     * @param {number} month - 월
-     * @returns {Object} - 투표 데이터
-     */
-    getVotes(departmentId, year, month) {
-        const department = this.departments.get(departmentId);
-        if (!department) {
-            throw new Error('부서를 찾을 수 없습니다.');
-        }
-
-        const result = {};
-        for (let [dateKey, voters] of Object.entries(department.votesData)) {
-            const [entryYear, entryMonth, entryDay] = dateKey.split('-').map(Number);
-            if (entryYear === year && entryMonth === month) {
-                result[entryDay] = voters;
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * 모든 사용자를 가져오는 함수
-     * @returns {Array} - 모든 사용자 리스트
-     */
-    getAllUsers() {
-        return Array.from(this.users.values());
-    }
+    // ... Additional methods as needed
 }
 
 module.exports = new VotesManager();
