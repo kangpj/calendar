@@ -69,33 +69,13 @@ function isUserSignedIn(clientId) {
     return user && user.type !== votesManager.userTypes.ANONYMOUS;
 }
 
-// 사용자 ��록을 특정 클라이언트에게 전송하는 함수
-function sendUserList(ws, clientId) {
-    const userData = votesManager.getUserData(clientId);
-    if (!userData) {
-        sendMessage(ws, 'error', { message: '사용자 데이터가 없습니다.' });
-        return;
-    }
 
-    const targetDepartments = [userData.departmentId, 'float']; // 자신의 부서와 기본 부서
-    const allUsers = votesManager.getAllUsers();
 
-    const userList = allUsers
-        .filter(user => targetDepartments.includes(user.department))
-        .map(user => ({
-            userId: user.userId,
-            name: user.name,
-            phone: user.phone,
-            department: user.department,
-            userType: user.userType,
-            isManager: user.userType === votesManager.userTypes.MANAGER || user.userType === votesManager.userTypes.SUPERUSER,
-            isSelf: user.userId === userData.userId // 클라이언트 자신인지 확인
-        }));
-
-    sendMessage(ws, 'userList', userList);
-}
-
-// 사용자 목록을 모든 클라이언트에게 전송하는 함수
+/**
+ * Sends the updated user list to all clients.
+ * Optionally filters by department.
+ * @param {string} [departmentId='all'] - Department to filter users by.
+ */
 function broadcastUserList(departmentId = 'all') {
     let filteredUsers;
     if (departmentId === 'all') {
@@ -106,17 +86,15 @@ function broadcastUserList(departmentId = 'all') {
     broadcastMessage('userList', filteredUsers);
 }
 
-// WebSocket 연결 핸들링
-wss.on('connection', (ws, req) => {
-
+// WebSocket 연결 시 처리 로직
+wss.on('connection', (ws) => {
     let registeredClientId = null;
-
-    console.log(`New client connected. Awaiting initialization.`);
 
     ws.on('message', async (message) => {
         try {
             const parsedMessage = JSON.parse(message);
             
+            // Handle 'init' message for client initialization
             if (parsedMessage.type === 'init') {
                 const { clientId: initClientId } = parsedMessage.data;
                 if (!initClientId) {
@@ -135,7 +113,7 @@ wss.on('connection', (ws, req) => {
                 if (!existingUserData) {
                     // If not, create an anonymous user and associate with clientId
                     const anonymousUser = await votesManager.addAnonymousUser();
-                    votesManager.addUser(initClientId, anonymousUser.userId, anonymousUser.departmentId, anonymousUser.name, anonymousUser.userType);
+                    votesManager.addUser(initClientId, anonymousUser.userId, votesManager.defaultDepartmentId, anonymousUser.name, anonymousUser.userType);
                 }
 
                 registeredClientId = initClientId;
@@ -145,21 +123,18 @@ wss.on('connection', (ws, req) => {
                 const userData = votesManager.getUserData(registeredClientId);
                 sendMessage(ws, 'initSuccess', userData);
 
-                // Send user list to the newly connected client
-                sendUserList(ws, registeredClientId);
-
                 // Broadcast updated user list to all clients
-                broadcastUserList('float');
+                broadcastUserList();
                 return;
             }
 
-            // Ensure the client has been initialized
+            // Ensure the client is initialized before handling other messages
             if (!registeredClientId) {
-                sendMessage(ws, 'error', { message: 'Client not initialized. Please send init message first.' });
+                sendMessage(ws, 'error', { message: 'Client not initialized. Please send an init message first.' });
                 return;
             }
 
-            // Handle other message types...
+            // Handle 'signUp' message
             if (parsedMessage.type === 'signUp') {
                 const { name, phone, passkey } = parsedMessage.data;
                 try {
@@ -184,8 +159,8 @@ wss.on('connection', (ws, req) => {
                     sendMessage(ws, 'signUpFailed', { message: error.message });
                 }
             }
-
-            if (parsedMessage.type === 'signIn') {
+            // Handle 'signIn' message
+            else if (parsedMessage.type === 'signIn') {
                 const { phone, passkey } = parsedMessage.data;
                 try {
                     // If client is already signed in, prevent re-signing
@@ -204,7 +179,6 @@ wss.on('connection', (ws, req) => {
                     sendMessage(ws, 'signInFailed', { message: error.message });
                 }
             }
-
             // Handle 'updateVote' message
             else if (parsedMessage.type === 'updateVote') {
                 const { departmentId, date } = parsedMessage.data;
@@ -220,13 +194,12 @@ wss.on('connection', (ws, req) => {
 
                     // Optionally, broadcast updated vote stats
                     // For example:
-                    const allVotes = votesManager.getAllVotes(departmentId, userData.userId);
+                    const allVotes = votesManager.getDepartmentVotes(departmentId);
                     broadcastMessage('votesUpdated', { departmentId, votes: allVotes }, [registeredClientId]);
                 } catch (error) {
                     sendMessage(ws, 'error', { message: error.message });
                 }
             }
-
             // Handle 'updateStats' message
             else if (parsedMessage.type === 'updateStats') {
                 // Example: Update user statistics or similar

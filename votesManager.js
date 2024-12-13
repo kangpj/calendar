@@ -36,10 +36,16 @@ class VotesManager {
         this.usersData.set('superclient', { 
             clientId: 'superclient',
             userId: superUser.userId, 
-            departmentId: 'All', 
+            departmentId: 'float', 
             nickname: 'superadmin', 
             type: this.userTypes.SUPERUSER 
         });
+
+        // Assign superuser as the owner of the 'float' department
+        this.addUserToDepartment(this.defaultDepartmentId, superUser.userId);
+        const floatDepartment = this.departments.get(this.defaultDepartmentId);
+        floatDepartment.owner = superUser.userId;
+        console.log(`Superuser ${superUser.userId} assigned as owner of department '${this.defaultDepartmentId}'.`);
     }
     
     // Helper method to generate unique user IDs
@@ -85,9 +91,11 @@ class VotesManager {
     }
 
     /**
-     * Revised addUser function to set only the usersData Map.
-     * Ensures that anonymous users are always assigned to the 'float' department.
+     * Adds a new user to the users Map.
+     * Sign-up users cannot be anonymous.
      * 
+     * @param {string} name - The user's full name.
+     * @param {string} phone - The user's phone number.
      * @param {string} clientId - The client ID.
      * @param {string} userId - The user ID to associate with the clientId.
      * @param {string} departmentId - The department ID the user belongs to.
@@ -117,16 +125,15 @@ class VotesManager {
     }
 
     /**
-     * Adds a new user to the users Map.
-     * Sign-up users cannot be anonymous.
+     * Adds a new user through sign-up (non-anonymous).
      * 
      * @param {string} name - The user's full name.
      * @param {string} phone - The user's phone number.
-     * @param {string} [passkey=null] - The user's passkey (required for non-anonymous users).
-     * @returns {Object} - The newly added user object.
-     * @throws {Error} - If required fields are missing or phone is taken.
+     * @param {string} passkey - The user's passkey.
+     * @returns {Object} - The newly created user object.
+     * @throws {Error} - If required fields are missing or phone is already taken.
      */
-    async addSignUpUser(name, phone, passkey = null) {
+    async addSignUpUser(name, phone, passkey) {
         // Sign-up users must be non-anonymous
         if (!name || !phone || !passkey) {
             throw new Error('Name, phone, and passkey are required for sign-up.');
@@ -153,8 +160,8 @@ class VotesManager {
             userType: this.userTypes.ONYMOUS
         };
         this.users.set(userId, newUser);
-        this.addUserToDepartment('float', userId); // Default department; can be modified as needed
-        console.log(`New user ${userId} added as 'onymous' to department 'float'.`);
+        this.addUserToDepartment(this.defaultDepartmentId, userId); // Default department; can be modified as needed
+        console.log(`New user ${userId} added as 'onymous' to department '${this.defaultDepartmentId}'.`);
         return newUser;
     }
 
@@ -185,121 +192,6 @@ class VotesManager {
         return newUser;
     }
 
-    // Helper method to check if a phone number is already taken
-    isPhoneTaken(phone) {
-        for (let user of this.users.values()) {
-            if (user.phone === phone) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Promote a user to manager.
-     * 
-     * @param {string} userId - The user ID to promote.
-     * @param {string} passkey - The user's passkey for verification.
-     * @returns {boolean} - Returns true if promotion is successful.
-     * @throws {Error} - If user does not exist, is already a manager/superuser, or passkey is invalid.
-     */
-    async promoteToManager(userId, passkey) {
-        const user = this.users.get(userId);
-        if (!user) {
-            throw new Error('User not found.');
-        }
-
-        if (user.userType === this.userTypes.SUPERUSER) {
-            throw new Error('User is already a superuser.');
-        }
-
-        if (user.userType === this.userTypes.MANAGER) {
-            throw new Error('User is already a manager.');
-        }
-
-        if (user.userType === this.userTypes.ANONYMOUS) {
-            throw new Error('Anonymous users cannot be promoted.');
-        }
-
-        if (user.userType !== this.userTypes.ONYMOUS) {
-            throw new Error('Only onymous users can be promoted to manager.');
-        }
-
-        if (!user.passkey) {
-            throw new Error('User does not have a passkey set.');
-        }
-
-        const isPasskeyValid = await bcrypt.compare(passkey, user.passkey);
-        if (!isPasskeyValid) {
-            throw new Error('Invalid passkey.');
-        }
-
-        user.userType = this.userTypes.MANAGER;
-        this.users.set(userId, user);
-        console.log(`User ${userId} has been promoted to manager.`);
-        return true;
-    }
-
-    /**
-     * Demote a manager to onymous.
-     * 
-     * @param {string} userId - The user ID to demote.
-     * @returns {boolean} - Returns true if demotion is successful.
-     * @throws {Error} - If user does not exist or is not a manager.
-     */
-    demoteManager(userId) {
-        const user = this.users.get(userId);
-        if (!user) {
-            throw new Error('User not found.');
-        }
-
-        if (user.userType !== this.userTypes.MANAGER) {
-            throw new Error('User is not a manager.');
-        }
-
-        user.userType = this.userTypes.ONYMOUS;
-        this.users.set(userId, user);
-        console.log(`User ${userId} has been demoted to onymous.`);
-        return true;
-    }
-
-    /**
-     * Promote a user to superuser.
-     * 
-     * @param {string} userId - The user ID to promote.
-     * @param {string} passkey - The user's passkey for verification.
-     * @returns {boolean} - Returns true if promotion is successful.
-     * @throws {Error} - If user does not exist, is already a superuser, or passkey is invalid.
-     */
-    async promoteToSuperUser(userId, passkey) {
-        const user = this.users.get(userId);
-        if (!user) {
-            throw new Error('User not found.');
-        }
-
-        if (user.userType === this.userTypes.SUPERUSER) {
-            throw new Error('User is already a superuser.');
-        }
-
-        if (user.userType !== this.userTypes.MANAGER) {
-            throw new Error('Only managers can be promoted to superusers.');
-        }
-
-        if (!user.passkey) {
-            throw new Error('User does not have a passkey set.');
-        }
-
-        const isPasskeyValid = await bcrypt.compare(passkey, user.passkey);
-        if (!isPasskeyValid) {
-            throw new Error('Invalid passkey.');
-        }
-
-        user.userType = this.userTypes.SUPERUSER;
-        this.users.set(userId, user);
-        console.log(`User ${userId} has been promoted to superuser.`);
-        return true;
-    }
-
     /**
      * Get user data associated with a clientId.
      * 
@@ -311,69 +203,50 @@ class VotesManager {
     }
 
     /**
-     * Retrieve votes data for a specific department.
+     * Check if a phone number is already taken.
      * 
-     * @param {string} departmentId - The department ID.
-     * @returns {Object} - Votes data for the department.
+     * @param {string} phone - The phone number to check.
+     * @returns {boolean} - True if taken, else false.
      */
-    getAllVotes(departmentId, requestingUserId) {
-        const department = this.departments.get(departmentId);
-        if (!department) {
-            throw new Error(`Department '${departmentId}' does not exist.`);
-        }
-        // Implement role-based access if needed
-        return department.votesData;
-    }
-
-    /**
-     * Update vote for a specific date in a department.
-     * 
-     * @param {string} departmentId - The department ID.
-     * @param {string} date - The date for which the vote is cast.
-     * @param {string} userId - The user ID casting the vote.
-     */
-    updateVote(departmentId, date, userId) {
-        const department = this.departments.get(departmentId);
-        if (!department) {
-            throw new Error(`Department '${departmentId}' does not exist.`);
-        }
-
-        if (!department.votesData[date]) {
-            department.votesData[date] = new Set();
-        }
-
-        department.votesData[date].add(userId);
-        console.log(`User ${userId} cast a vote for ${date} in department ${departmentId}.`);
-    }
-
-    /**
-     * Get all users in the system.
-     * 
-     * @returns {Array<Object>} - List of all user objects.
-     */
-    getAllUsers() {
-        return Array.from(this.users.values()).map(user => ({
-            userId: user.userId,
-            name: user.name,
-            phone: user.phone,
-            department: this.getUserDepartment(user.userId),
-            userType: user.userType
-        }));
-    }
-
-    /**
-     * Get the department ID of a user.
-     * 
-     * @param {string} userId - The user ID.
-     * @returns {string|null} - The department ID or null if not found.
-     */
-    getUserDepartment(userId) {
-        for (let [deptId, dept] of this.departments.entries()) {
-            if (dept.members.has(userId)) {
-                return deptId;
+    isPhoneTaken(phone) {
+        for (let user of this.users.values()) {
+            if (user.phone === phone) {
+                return true;
             }
         }
-        return null;
+        return false;
+    }
+
+    /**
+     * Authenticate and log in a user.
+     * 
+     * @param {string} clientId - The client ID.
+     * @param {string} phone - The user's phone number.
+     * @param {string} passkey - The user's passkey.
+     * @returns {Object} - The authenticated user data.
+     * @throws {Error} - If authentication fails.
+     */
+    async loginUser(clientId, phone, passkey) {
+        for (let user of this.users.values()) {
+            if (user.phone === phone) {
+                const isMatch = await bcrypt.compare(passkey, user.passkey);
+                if (isMatch) {
+                    // Associate clientId with user
+                    this.addUser(clientId, user.userId, this.getUserDepartment(user.userId), user.name, user.userType);
+                    console.log(`User ${user.userId} logged in with clientId ${clientId}.`);
+                    return {
+                        userId: user.userId,
+                        name: user.name,
+                        phone: user.phone,
+                        departmentId: this.getUserDepartment(user.userId),
+                        userType: user.userType
+                    };
+                } else {
+                    throw new Error('Invalid passkey.');
+                }
+            }
+        }
+        throw new Error('User with the provided phone number does not exist.');
     }
 
     /**
@@ -407,6 +280,14 @@ class VotesManager {
                         if (departmentId !== this.defaultDepartmentId) {
                             this.departments.delete(departmentId);
                             console.log(`Department ${departmentId} has been removed due to no members.`);
+                        } else {
+                            // Ensure 'float' department always has an owner
+                            const superUser = Array.from(this.users.values()).find(u => u.userType === this.userTypes.SUPERUSER);
+                            if (superUser) {
+                                department.owner = superUser.userId;
+                                department.members.add(superUser.userId);
+                                console.log(`Superuser ${superUser.userId} re-assigned as owner of department '${departmentId}'.`);
+                            }
                         }
                     }
                 }
