@@ -192,6 +192,9 @@ class VotesManager {
         return newUser;
     }
 
+    getAllUsers() {
+        return this.users;
+    }
     /**
      * Get user data associated with a clientId.
      * 
